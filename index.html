@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Officer Task Status Dashboard</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background: #f8f9fa;
+    }
+    h1 { margin-bottom: 5px; }
+    h3 { margin-top: 30px; }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+        background: white;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        font-size: 14px;
+        text-align: center;
+    }
+    th {
+        background: #343a40;
+        color: white;
+    }
+    .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    .info {
+        margin-top: 20px;
+        padding: 10px;
+        background: #e9ecef;
+        border-left: 5px solid #0d6efd;
+    }
+</style>
+</head>
+
+<body>
+
+<h1>📊 Master Dashboard – Officer Task Status</h1>
+<p>Weekly officer status + Star-mark task summary</p>
+
+<div id="loading">⏳ Loading data...</div>
+
+<div class="grid">
+    <div>
+        <h3>📋 Officer-wise Weekly Status (Latest Week)</h3>
+        <table id="weeklyTable"></table>
+    </div>
+    <div>
+        <h3>⭐ Star-Mark Officer Summary</h3>
+        <table id="starTable"></table>
+    </div>
+</div>
+
+<h3>⚖️ Upcoming Court Cases</h3>
+<table id="courtTable"></table>
+
+<div class="info">
+    Top tables show <b>weekly status</b> and <b>Star-mark summary</b>.  
+    Bottom table shows <b>upcoming court hearings (date only)</b>.
+</div>
+
+<script>
+/* --------------------------------------------------
+CONFIG
+-------------------------------------------------- */
+
+const OFFICER_SHEETS = {
+    "ADC G": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "174981592"],
+    "ADC D": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "537074213"],
+    "ADC (UD)": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "846764018"],
+    "ADC K": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "1476602908"],
+    "ADC J": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "18822170"],
+    "ACG": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "1291568180"],
+    "CMFO": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "1227420096"],
+};
+
+const STAR_URL = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534";
+
+const COURT_URL = "https://docs.google.com/spreadsheets/d/1VUnD7ySFzIkeZlaq8E5XG8r2xXcos6lhIt62QZEeHKs/export?format=csv&gid=0";
+
+/* --------------------------------------------------
+HELPERS
+-------------------------------------------------- */
+
+function csvToArray(csv) {
+    return csv.trim().split("\n").map(r => r.split(","));
+}
+
+function renderTable(id, headers, rows) {
+    let html = "<tr>" + headers.map(h => `<th>${h}</th>`).join("") + "</tr>";
+    rows.forEach(r => {
+        html += "<tr>" + r.map(c => `<td>${c}</td>`).join("") + "</tr>";
+    });
+    document.getElementById(id).innerHTML = html;
+}
+
+/* --------------------------------------------------
+WEEKLY STATUS LOGIC (UNCHANGED)
+-------------------------------------------------- */
+
+async function loadWeekly() {
+    const rows = [];
+
+    for (const officer in OFFICER_SHEETS) {
+        try {
+            const [sid, gid] = OFFICER_SHEETS[officer];
+            const url = `https://docs.google.com/spreadsheets/d/${sid}/export?format=csv&gid=${gid}`;
+            const data = csvToArray(await (await fetch(url)).text());
+
+            let statusCol = -1;
+            for (let c = 0; c < data[0].length; c++) {
+                const head = data.slice(0, 10).map(r => (r[c] || "").toLowerCase());
+                if (head.some(v => v.includes("status"))) statusCol = c;
+            }
+
+            let pending = 0, completed = 0;
+            data.slice(10).forEach(r => {
+                const v = (r[statusCol] || "").toLowerCase();
+                if (v.includes("pending") || v.includes("incomplete")) pending++;
+                if (v.includes("complete")) completed++;
+            });
+
+            rows.push([
+                officer,
+                pending > 0 ? "Incomplete" : "Complete",
+                pending,
+                completed
+            ]);
+
+        } catch {
+            rows.push([officer, "Error", "-", "-"]);
+        }
+    }
+
+    renderTable("weeklyTable",
+        ["Officer Name", "Overall Status", "No. of Tasks Incomplete", "No. of Tasks Completed"],
+        rows
+    );
+}
+
+/* --------------------------------------------------
+STAR MARK LOGIC
+-------------------------------------------------- */
+
+async function loadStar() {
+    const data = csvToArray(await (await fetch(STAR_URL)).text());
+    const headers = data[0];
+    const rows = data.slice(1);
+
+    const dateIdx = headers.findIndex(h => h.toLowerCase().includes("date"));
+    const officerIdx = headers.indexOf("Marked to Officer");
+    const statusIdx = headers.indexOf("Status");
+
+    const last7 = new Date();
+    last7.setDate(last7.getDate() - 7);
+
+    const map = {};
+
+    rows.forEach(r => {
+        const officer = r[officerIdx];
+        const status = (r[statusIdx] || "").toLowerCase();
+        const date = new Date(r[dateIdx]);
+
+        if (!map[officer]) map[officer] = {completed:0, pending:0};
+
+        if (status === "completed" && date >= last7) map[officer].completed++;
+        if (status !== "completed") map[officer].pending++;
+    });
+
+    const tableRows = Object.entries(map).map(([k,v]) => [k, v.completed, v.pending]);
+
+    renderTable("starTable",
+        ["Marked to Officer", "Completed (Last 7 Days)", "Pending Tasks"],
+        tableRows
+    );
+}
+
+/* --------------------------------------------------
+COURT CASES LOGIC
+-------------------------------------------------- */
+
+async function loadCourt() {
+    const data = csvToArray(await (await fetch(COURT_URL)).text());
+    const headers = data[0];
+    const rows = data.slice(1);
+
+    const o = headers.indexOf("Supervisior office");
+    const d = headers.indexOf("Next Hearing Date");
+    const c = headers.findIndex(h => h.includes("Name of Court"));
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const filtered = rows
+        .map(r => [r[o], new Date(r[d]), r[c]])
+        .filter(r => r[1] >= today)
+        .sort((a,b) => a[1] - b[1])
+        .map(r => [r[0], r[1].toISOString().split("T")[0], r[2]]);
+
+    renderTable("courtTable",
+        ["Name of the Officer", "Upcoming Hearing Date", "Name of Court"],
+        filtered
+    );
+}
+
+/* --------------------------------------------------
+LOAD ALL
+-------------------------------------------------- */
+
+Promise.all([loadWeekly(), loadStar(), loadCourt()]).then(() => {
+    document.getElementById("loading").style.display = "none";
+});
+</script>
+
+</body>
+</html>
