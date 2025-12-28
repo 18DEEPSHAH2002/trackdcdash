@@ -26,7 +26,7 @@
         <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div>
                 <h1 class="text-2xl font-800 text-slate-900 tracking-tight">Officer Task Dashboard</h1>
-                <p class="text-slate-500 text-sm">Strict Logic: Only counting "pending" as incomplete.</p>
+                <p class="text-slate-500 text-sm">Real-time status tracking across administrative offices.</p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="bg-white border px-4 py-2 rounded-lg shadow-sm text-xs font-bold text-slate-600">
@@ -92,15 +92,15 @@
                 <!-- Logic Summary -->
                 <div class="mt-6 bg-slate-800 rounded-xl p-5 text-white shadow-lg">
                     <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
-                        <i class="fas fa-filter text-blue-400"></i> Counting Rule
+                        <i class="fas fa-filter text-blue-400"></i> Counting Logic
                     </h4>
                     <p class="text-xs text-slate-300 leading-relaxed">
-                        The system identifies the current week by finding the last column containing data.
+                        The dashboard identifies the latest column that contains any status text.
                     </p>
                     <ul class="text-xs space-y-3 mt-4 text-slate-300">
-                        <li class="flex gap-2"><i class="fas fa-info-circle text-blue-400"></i> <b>Incomplete:</b> Only rows explicitly marked <span class="text-red-400 font-bold">"pending"</span> are counted.</li>
-                        <li class="flex gap-2"><i class="fas fa-check-circle text-green-400"></i> <b>Complete:</b> <span class="text-green-400 font-bold">"completed"</span> or any other text is treated as finished.</li>
-                        <li class="flex gap-2"><i class="fas fa-search text-yellow-400"></i> <b>Validation:</b> We only count rows that have a Serial Number or a Task Name.</li>
+                        <li class="flex gap-2"><i class="fas fa-info-circle text-blue-400"></i> <b>Pending:</b> Any cell containing the word <span class="text-red-400 font-bold">"pending"</span> is counted.</li>
+                        <li class="flex gap-2"><i class="fas fa-check-circle text-green-400"></i> <b>Complete:</b> Everything else (including "completed" or empty cells) is considered complete.</li>
+                        <li class="flex gap-2"><i class="fas fa-search text-yellow-400"></i> <b>Scanning:</b> The script reads the entire height of the sheet to ensure no rows are missed.</li>
                     </ul>
                 </div>
             </div>
@@ -154,7 +154,7 @@
         }
 
         /**
-         * Robust CSV row parser
+         * Robust CSV line parser
          */
         function parseCsvLine(line) {
             const result = [];
@@ -175,56 +175,56 @@
         }
 
         function analyzeSheet(csv) {
-            // Split into rows and clean up carriage returns
+            // Split rows and filter out true empty rows
             const rows = csv.split(/\r?\n/).filter(line => line.trim() !== "").map(line => parseCsvLine(line));
             
             if (rows.length < 2) return { incompleteCount: 0, status: 'Empty', week: 'Unknown' };
 
             const header = rows[0];
             
-            // 1. Better Column Detection
-            // We scan from right to left to find the last column that contains "pending" or "completed"
+            // 1. Detect the LATEST Status Column
+            // Search right-to-left for a column that contains any text like "pending" or "completed"
             let targetCol = -1;
             for (let c = header.length - 1; c >= 2; c--) {
-                const columnHasStatus = rows.slice(1).some(r => {
+                const columnHasStatusMarkers = rows.slice(1).some(r => {
                     const val = (r[c] || "").toLowerCase();
-                    return val === "pending" || val === "completed";
+                    return val.includes("pending") || val.includes("completed");
                 });
-                if (columnHasStatus) {
+                if (columnHasStatusMarkers) {
                     targetCol = c;
                     break;
                 }
             }
 
-            // Fallback to last non-empty column if detection fails
+            // Fallback: if no clear markers found, use the last column that has any non-empty header
             if (targetCol === -1) {
                 targetCol = header.length - 1;
-                while (targetCol > 1 && (!header[targetCol] || header[targetCol] === "")) targetCol--;
+                while (targetCol > 1 && (!header[targetCol] || header[targetCol].trim() === "")) targetCol--;
             }
 
-            let pCount = 0;
+            let pendingCount = 0;
             const weekLabel = header[targetCol] || "Current Week";
 
-            // 2. Iterate Data Rows
+            // 2. Scan every row
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                const srNo = row[0]; // Sr. No
-                const taskName = row[1]; // Task Name
                 const status = (row[targetCol] || "").toLowerCase().trim();
+                const taskName = row[1] || "";
 
-                // Validation: Only count rows that appear to be actual tasks
-                // If there's no Task Name and no Serial Number, ignore the row.
-                if ((!taskName || taskName === "") && (!srNo || srNo === "")) continue;
+                // If the status is empty and task name is empty, it's a padding row
+                if (!status && !taskName) continue;
 
-                // User Request: if written "pending" -> pendency. Everything else -> complete.
-                if (status === "pending") {
-                    pCount++;
+                // STRICT USER LOGIC:
+                // Only if the status text contains "pending" -> count it.
+                // Otherwise treat as complete.
+                if (status.includes("pending")) {
+                    pendingCount++;
                 }
             }
 
             return {
-                incompleteCount: pCount,
-                status: pCount === 0 ? 'Complete' : 'Incomplete',
+                incompleteCount: pendingCount,
+                status: pendingCount === 0 ? 'Complete' : 'Incomplete',
                 week: weekLabel
             };
         }
@@ -240,7 +240,7 @@
             let stars = 0;
 
             const sample = data.find(d => d.week && d.week !== 'Unknown');
-            weekLabel.innerText = sample ? sample.week : "Active Week";
+            weekLabel.innerText = sample ? sample.week : "Current Week";
             document.getElementById('officerCount').innerText = `${data.length} Officers`;
 
             data.forEach(item => {
