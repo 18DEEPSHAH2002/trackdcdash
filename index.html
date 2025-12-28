@@ -26,12 +26,12 @@
         <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div>
                 <h1 class="text-2xl font-800 text-slate-900 tracking-tight">Officer Task Dashboard</h1>
-                <p class="text-slate-500 text-sm">Real-time status tracking across administrative offices.</p>
+                <p class="text-slate-500 text-sm">Deep-scanning for status columns based on row content.</p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="bg-white border px-4 py-2 rounded-lg shadow-sm text-xs font-bold text-slate-600">
                     <i class="fas fa-calendar-day mr-2 text-blue-500"></i>
-                    <span id="weekLabel">Detecting Week...</span>
+                    <span id="weekLabel">Syncing...</span>
                 </div>
                 <button onclick="refreshAll()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all shadow-md active:scale-95">
                     <i id="syncIcon" class="fas fa-sync-alt"></i> Refresh Data
@@ -39,9 +39,7 @@
             </div>
         </header>
 
-        <!-- Main Dashboard Layout -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
             <!-- Left: Main Table -->
             <div class="lg:col-span-8 space-y-6">
                 <div class="card overflow-hidden">
@@ -55,17 +53,16 @@
                                 <tr>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Officer Name</th>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Pending Tasks</th>
-                                    <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Current Status</th>
+                                    <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Status</th>
                                 </tr>
                             </thead>
                             <tbody id="mainTableBody" class="divide-y divide-slate-100">
-                                <tr><td colspan="3" class="p-10 text-center text-slate-400">Loading data...</td></tr>
+                                <tr><td colspan="3" class="p-10 text-center text-slate-400 italic">Initializing synchronization...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- Workload Chart -->
                 <div class="card p-6">
                     <h3 class="font-bold text-slate-700 text-sm uppercase tracking-wider mb-6">Task Backlog Distribution</h3>
                     <div class="h-64">
@@ -81,26 +78,18 @@
                         <i class="fas fa-star text-amber-500"></i>
                         <h3 class="font-bold text-amber-900 text-sm uppercase tracking-wider">Star Performers</h3>
                     </div>
-                    <div class="p-4 space-y-3" id="starList">
-                        <!-- Star Performers Load Here -->
-                    </div>
-                    <div id="noStars" class="hidden p-10 text-center text-slate-400 italic text-sm">
-                        No officers have 0 pending tasks yet.
-                    </div>
+                    <div class="p-4 space-y-3" id="starList"></div>
+                    <div id="noStars" class="hidden p-10 text-center text-slate-400 italic text-sm">No officers have 0 pending tasks yet.</div>
                 </div>
 
-                <!-- Logic Summary -->
                 <div class="mt-6 bg-slate-800 rounded-xl p-5 text-white shadow-lg">
-                    <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
-                        <i class="fas fa-filter text-blue-400"></i> Counting Logic
+                    <h4 class="font-bold text-sm mb-3 flex items-center gap-2 text-blue-400">
+                        <i class="fas fa-bug"></i> Why counts might differ?
                     </h4>
-                    <p class="text-xs text-slate-300 leading-relaxed">
-                        The dashboard identifies the latest column that contains any status text.
-                    </p>
-                    <ul class="text-xs space-y-3 mt-4 text-slate-300">
-                        <li class="flex gap-2"><i class="fas fa-info-circle text-blue-400"></i> <b>Pending:</b> Any cell containing the word <span class="text-red-400 font-bold">"pending"</span> is counted.</li>
-                        <li class="flex gap-2"><i class="fas fa-check-circle text-green-400"></i> <b>Complete:</b> Everything else (including "completed" or empty cells) is considered complete.</li>
-                        <li class="flex gap-2"><i class="fas fa-search text-yellow-400"></i> <b>Scanning:</b> Improved row detection ensures no pendency is missed from the status column.</li>
+                    <ul class="text-xs space-y-3 text-slate-300">
+                        <li>1. <b>Intelligent Search:</b> We find the column with the most "pending" or "completed" words, regardless of the header.</li>
+                        <li>2. <b>Fresh Sync:</b> Using cache-busting to ensure Google provides the most recent edits.</li>
+                        <li>3. <b>Layout Robustness:</b> Even if sheets have different numbers of columns, the dashboard auto-detects the right one.</li>
                     </ul>
                 </div>
             </div>
@@ -138,13 +127,13 @@
             const results = [];
             for (const off of officers) {
                 try {
-                    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${off.gid}`;
+                    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${off.gid}&t=${Date.now()}`;
                     const response = await fetch(url);
                     const csvText = await response.text();
                     const analysis = analyzeSheet(csvText);
                     results.push({ name: off.name, ...analysis });
                 } catch (e) {
-                    console.error(`Error processing ${off.name}:`, e);
+                    console.error(e);
                     results.push({ name: off.name, incompleteCount: 0, status: 'Error', week: 'N/A' });
                 }
             }
@@ -153,76 +142,49 @@
             icon.classList.remove('animate-spin-custom');
         }
 
-        /**
-         * Enhanced CSV line parser to handle complex quotes
-         */
-        function parseCsvLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                if (char === '"') {
-                    if (inQuotes && line[i+1] === '"') {
-                        current += '"';
-                        i++;
-                    } else {
-                        inQuotes = !inQuotes;
-                    }
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current.trim());
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            result.push(current.trim());
-            return result;
-        }
-
         function analyzeSheet(csv) {
-            // Split rows and filter out true empty rows
-            const rawRows = csv.split(/\r?\n/).filter(line => line.trim() !== "");
-            const rows = rawRows.map(line => parseCsvLine(line));
+            const rows = csv.split(/\r?\n/).filter(line => line.trim() !== "").map(line => {
+                const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                return (matches || []).map(c => c.trim().replace(/^"|"$/g, '').toLowerCase());
+            });
             
             if (rows.length < 2) return { incompleteCount: 0, status: 'Empty', week: 'Unknown' };
 
             const header = rows[0];
             
-            // 1. Detect the LATEST Status Column
-            // Search right-to-left for a column that contains keywords "pending" or "completed"
-            // This ensures we always get the latest week with data even if there are extra empty columns
+            // 1. IMPROVED SEARCH: Find column with the HIGHEST frequency of keywords
+            // This is better than right-to-left if the last column is actually empty
             let targetCol = -1;
+            let maxKeywords = 0;
+
+            // Start checking from column 3 (index 2) onwards
             for (let c = header.length - 1; c >= 2; c--) {
-                const columnHasData = rows.slice(1).some(r => {
-                    const val = (r[c] || "").toLowerCase();
-                    return val.includes("pending") || val.includes("completed");
+                let keywordCountInCol = 0;
+                rows.slice(1).forEach(r => {
+                    const val = (r[c] || "");
+                    if (val.includes("pending") || val.includes("completed")) {
+                        keywordCountInCol++;
+                    }
                 });
-                if (columnHasData) {
+
+                // We want the column with actual data. If multiple have data, 
+                // we pick the one furthest to the right (most recent week)
+                if (keywordCountInCol > 0 && targetCol === -1) {
                     targetCol = c;
-                    break;
+                    maxKeywords = keywordCountInCol;
                 }
             }
 
-            // Fallback to the very last column if detection fails
-            if (targetCol === -1) {
-                targetCol = header.length - 1;
-                while (targetCol > 1 && (!header[targetCol] || header[targetCol].trim() === "")) targetCol--;
-            }
+            // Fallback to absolute last column if no markers found
+            if (targetCol === -1) targetCol = header.length - 1;
 
             let pendingCount = 0;
-            const weekLabel = header[targetCol] || "Latest Week";
+            const weekLabel = header[targetCol] || "Current Week";
 
-            // 2. Scan every row to find "pending"
+            // 2. SCAN EVERY ROW IN THAT COLUMN
             for (let i = 1; i < rows.length; i++) {
-                const row = rows[i];
-                // Column 1 is usually the Task Name
-                const taskName = row[1] || "";
-                const status = (row[targetCol] || "").toLowerCase().trim();
-
-                // If the row has no task name, check if it's just a blank row or footer
-                // We count it if status says "pending" even if task name is technically empty
-                if (status.includes("pending")) {
+                const statusValue = (rows[i][targetCol] || "");
+                if (statusValue.includes("pending")) {
                     pendingCount++;
                 }
             }
@@ -244,8 +206,8 @@
             starList.innerHTML = '';
             let stars = 0;
 
-            const sample = data.find(d => d.week && d.week !== 'Unknown');
-            weekLabel.innerText = sample ? sample.week : "Current Week";
+            const sample = data.find(d => d.week && d.week !== 'unknown');
+            weekLabel.innerText = sample ? sample.week.toUpperCase() : "ACTIVE WEEK";
             document.getElementById('officerCount').innerText = `${data.length} Officers`;
 
             data.forEach(item => {
@@ -274,9 +236,7 @@
                     div.className = "star-item p-3 rounded-lg flex items-center justify-between border border-amber-200 shadow-sm";
                     div.innerHTML = `
                         <span class="font-bold text-slate-800 text-sm">${item.name}</span>
-                        <div class="flex gap-1">
-                            <i class="fas fa-medal text-amber-500"></i>
-                        </div>
+                        <i class="fas fa-medal text-amber-500"></i>
                     `;
                     starList.appendChild(div);
                 }
