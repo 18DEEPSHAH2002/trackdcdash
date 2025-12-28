@@ -26,7 +26,7 @@
         <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div>
                 <h1 class="text-2xl font-800 text-slate-900 tracking-tight">Officer Task Dashboard</h1>
-                <p class="text-slate-500 text-sm">Deep-scanning 16 Departmental Sheets for Pending Tasks</p>
+                <p class="text-slate-500 text-sm">Scanning 16 Departmental Sheets for "Pending" Status</p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="bg-white border px-4 py-2 rounded-lg shadow-sm text-xs font-bold text-slate-600">
@@ -42,7 +42,7 @@
         <!-- Main Dashboard Layout -->
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
-            <!-- Left: Main Table (The "Dashboard Table") -->
+            <!-- Left: Main Table -->
             <div class="lg:col-span-8 space-y-6">
                 <div class="card overflow-hidden">
                     <div class="p-4 border-b bg-slate-50 flex justify-between items-center">
@@ -54,7 +54,7 @@
                             <thead class="bg-white border-b">
                                 <tr>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase">Officer Name</th>
-                                    <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Incomplete Tasks</th>
+                                    <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Pending Tasks</th>
                                     <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase text-center">Current Status</th>
                                 </tr>
                             </thead>
@@ -92,12 +92,12 @@
                 <!-- Logic Summary -->
                 <div class="mt-6 bg-slate-800 rounded-xl p-5 text-white shadow-lg">
                     <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
-                        <i class="fas fa-microscope text-blue-400"></i> Scanning Logic
+                        <i class="fas fa-filter text-blue-400"></i> Defined Logic
                     </h4>
                     <ul class="text-xs space-y-3 text-slate-300">
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Full Column Scan:</b> We look at every single row from row 1 to 500+.</li>
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Strict Status:</b> Any task not explicitly marked "Completed" or "Done" is counted as Incomplete.</li>
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Auto-Week:</b> Detects the right-most column header in your sheet that contains non-empty data cells.</li>
+                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Pending:</b> Only cells explicitly containing "pending" are counted.</li>
+                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Completed:</b> Cells containing "completed" are marked as done.</li>
+                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Fallback:</b> Any other value (or empty) is treated as "completed".</li>
                     </ul>
                 </div>
             </div>
@@ -151,9 +151,7 @@
         }
 
         function analyzeSheet(csv) {
-            // Split by rows and handle CSV quoting correctly
             const rows = csv.split('\n').map(r => {
-                // Improved CSV parser to handle quoted commas
                 const matches = r.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
                 return (matches || []).map(c => c.trim().replace(/^"|"$/g, ''));
             });
@@ -162,10 +160,7 @@
 
             const header = rows[0];
             
-            // 1. Find the LATEST Week Column
-            // We search from right to left for the first column that has:
-            // a) a header 
-            // b) at least one non-empty value in the rows below it
+            // 1. Find the LATEST Week Column with data
             let latestCol = header.length - 1;
             let found = false;
             while (latestCol > 1 && !found) {
@@ -177,38 +172,30 @@
                 }
             }
 
-            // Fallback if no specific week column is found
             if (latestCol <= 1) latestCol = header.length - 1;
 
-            let icCount = 0;
+            let pendingCount = 0;
             const weekName = header[latestCol] || "Current Week";
 
-            // 2. Iterate EVERY row to check task status
+            // 2. Iterate Rows
             for (let i = 1; i < rows.length; i++) {
-                const taskName = rows[i][1]; // Column B is usually Task Name
+                const taskName = rows[i][1]; 
                 const status = (rows[i][latestCol] || "").toLowerCase().trim();
 
-                // If no task name, ignore the row (likely end of data)
+                // Skip empty task rows
                 if (!taskName || taskName.length < 2) continue;
 
-                // STRICT CRITERIA:
-                // Only "complete", "completed", "done", "yes" (and variants) are considered success.
-                // Any other text (like "pending", "no", "ic") OR an empty cell is Incomplete.
-                const isDone = status === "complete" || 
-                               status === "completed" || 
-                               status === "done" || 
-                               status === "yes" || 
-                               status === "y" ||
-                               status === "ok";
-
-                if (!isDone) {
-                    icCount++;
+                // NEW LOGIC:
+                // Only if written "pending" -> count as pending
+                // Otherwise (if "completed" or anything else) -> treat as completed
+                if (status === "pending") {
+                    pendingCount++;
                 }
             }
 
             return {
-                incompleteCount: icCount,
-                status: icCount === 0 ? 'Complete' : 'Incomplete',
+                incompleteCount: pendingCount,
+                status: pendingCount === 0 ? 'Complete' : 'Incomplete',
                 week: weekName
             };
         }
@@ -223,34 +210,31 @@
             starList.innerHTML = '';
             let stars = 0;
 
-            // Set the week label from the first valid data point
             const sample = data.find(d => d.week && d.week !== 'Unknown');
             weekLabel.innerText = sample ? sample.week : "Active Week";
             document.getElementById('officerCount').innerText = `${data.length} Officers`;
 
             data.forEach(item => {
-                const isIC = item.incompleteCount > 0;
+                const hasPending = item.incompleteCount > 0;
                 
-                // Dashboard Table Row
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-slate-50 transition-colors";
                 tr.innerHTML = `
                     <td class="px-6 py-4 font-bold text-slate-800">${item.name}</td>
                     <td class="px-6 py-4 text-center">
-                        <span class="text-lg font-mono font-black ${isIC ? 'text-red-600' : 'text-slate-300'}">
+                        <span class="text-lg font-mono font-black ${hasPending ? 'text-red-600' : 'text-slate-300'}">
                             ${item.incompleteCount}
                         </span>
                     </td>
                     <td class="px-6 py-4 text-center">
-                        <span class="status-pill ${isIC ? 'pill-red' : 'pill-green'}">
-                            ${item.status}
+                        <span class="status-pill ${hasPending ? 'pill-red' : 'pill-green'}">
+                            ${hasPending ? 'PENDING' : 'COMPLETED'}
                         </span>
                     </td>
                 `;
                 table.appendChild(tr);
 
-                // Star Performer Row
-                if (!isIC && item.status !== 'Error' && item.status !== 'Empty') {
+                if (!hasPending && item.status !== 'Error' && item.status !== 'Empty') {
                     stars++;
                     const div = document.createElement('div');
                     div.className = "star-item p-3 rounded-lg flex items-center justify-between border border-amber-200 shadow-sm";
@@ -277,7 +261,7 @@
                 data: {
                     labels: data.map(d => d.name),
                     datasets: [{
-                        label: 'Incomplete Tasks',
+                        label: 'Pending Tasks',
                         data: data.map(d => d.incompleteCount),
                         backgroundColor: data.map(d => d.incompleteCount > 0 ? '#ef4444' : '#10b981'),
                         borderRadius: 4
@@ -295,7 +279,6 @@
             });
         }
 
-        // Auto-run on load
         window.onload = refreshAll;
     </script>
 </body>
