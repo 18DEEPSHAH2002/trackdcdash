@@ -26,7 +26,7 @@
         <header class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
             <div>
                 <h1 class="text-2xl font-800 text-slate-900 tracking-tight">Officer Task Dashboard</h1>
-                <p class="text-slate-500 text-sm">Scanning 16 Departmental Sheets for "Pending" Status</p>
+                <p class="text-slate-500 text-sm">Strict Logic: Only counting "pending" as incomplete.</p>
             </div>
             <div class="flex items-center gap-3">
                 <div class="bg-white border px-4 py-2 rounded-lg shadow-sm text-xs font-bold text-slate-600">
@@ -59,7 +59,7 @@
                                 </tr>
                             </thead>
                             <tbody id="mainTableBody" class="divide-y divide-slate-100">
-                                <!-- Data will load here -->
+                                <tr><td colspan="3" class="p-10 text-center text-slate-400">Loading data...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -92,12 +92,15 @@
                 <!-- Logic Summary -->
                 <div class="mt-6 bg-slate-800 rounded-xl p-5 text-white shadow-lg">
                     <h4 class="font-bold text-sm mb-3 flex items-center gap-2">
-                        <i class="fas fa-filter text-blue-400"></i> Defined Logic
+                        <i class="fas fa-filter text-blue-400"></i> Counting Rule
                     </h4>
-                    <ul class="text-xs space-y-3 text-slate-300">
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Pending:</b> Only cells explicitly containing "pending" are counted.</li>
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Completed:</b> Cells containing "completed" are marked as done.</li>
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Fallback:</b> Any other value (or empty) is treated as "completed".</li>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        The system identifies the current week by finding the last column containing data.
+                    </p>
+                    <ul class="text-xs space-y-3 mt-4 text-slate-300">
+                        <li class="flex gap-2"><i class="fas fa-info-circle text-blue-400"></i> <b>Incomplete:</b> Only rows explicitly marked <span class="text-red-400 font-bold">"pending"</span> are counted.</li>
+                        <li class="flex gap-2"><i class="fas fa-check-circle text-green-400"></i> <b>Complete:</b> <span class="text-green-400 font-bold">"completed"</span> or any other text is treated as finished.</li>
+                        <li class="flex gap-2"><i class="fas fa-search text-yellow-400"></i> <b>Validation:</b> We only count rows that have a Serial Number or a Task Name.</li>
                     </ul>
                 </div>
             </div>
@@ -150,53 +153,79 @@
             icon.classList.remove('animate-spin-custom');
         }
 
+        /**
+         * Robust CSV row parser
+         */
+        function parseCsvLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') inQuotes = !inQuotes;
+                else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
         function analyzeSheet(csv) {
-            const rows = csv.split('\n').map(r => {
-                const matches = r.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-                return (matches || []).map(c => c.trim().replace(/^"|"$/g, ''));
-            });
+            // Split into rows and clean up carriage returns
+            const rows = csv.split(/\r?\n/).filter(line => line.trim() !== "").map(line => parseCsvLine(line));
             
             if (rows.length < 2) return { incompleteCount: 0, status: 'Empty', week: 'Unknown' };
 
             const header = rows[0];
             
-            // 1. Find the LATEST Week Column with data
-            let latestCol = header.length - 1;
-            let found = false;
-            while (latestCol > 1 && !found) {
-                const columnHasData = rows.slice(1).some(r => r[latestCol] && r[latestCol].trim() !== "");
-                if (header[latestCol] && header[latestCol].trim() !== "" && columnHasData) {
-                    found = true;
-                } else {
-                    latestCol--;
+            // 1. Better Column Detection
+            // We scan from right to left to find the last column that contains "pending" or "completed"
+            let targetCol = -1;
+            for (let c = header.length - 1; c >= 2; c--) {
+                const columnHasStatus = rows.slice(1).some(r => {
+                    const val = (r[c] || "").toLowerCase();
+                    return val === "pending" || val === "completed";
+                });
+                if (columnHasStatus) {
+                    targetCol = c;
+                    break;
                 }
             }
 
-            if (latestCol <= 1) latestCol = header.length - 1;
+            // Fallback to last non-empty column if detection fails
+            if (targetCol === -1) {
+                targetCol = header.length - 1;
+                while (targetCol > 1 && (!header[targetCol] || header[targetCol] === "")) targetCol--;
+            }
 
-            let pendingCount = 0;
-            const weekName = header[latestCol] || "Current Week";
+            let pCount = 0;
+            const weekLabel = header[targetCol] || "Current Week";
 
-            // 2. Iterate Rows
+            // 2. Iterate Data Rows
             for (let i = 1; i < rows.length; i++) {
-                const taskName = rows[i][1]; 
-                const status = (rows[i][latestCol] || "").toLowerCase().trim();
+                const row = rows[i];
+                const srNo = row[0]; // Sr. No
+                const taskName = row[1]; // Task Name
+                const status = (row[targetCol] || "").toLowerCase().trim();
 
-                // Skip empty task rows
-                if (!taskName || taskName.length < 2) continue;
+                // Validation: Only count rows that appear to be actual tasks
+                // If there's no Task Name and no Serial Number, ignore the row.
+                if ((!taskName || taskName === "") && (!srNo || srNo === "")) continue;
 
-                // NEW LOGIC:
-                // Only if written "pending" -> count as pending
-                // Otherwise (if "completed" or anything else) -> treat as completed
+                // User Request: if written "pending" -> pendency. Everything else -> complete.
                 if (status === "pending") {
-                    pendingCount++;
+                    pCount++;
                 }
             }
 
             return {
-                incompleteCount: pendingCount,
-                status: pendingCount === 0 ? 'Complete' : 'Incomplete',
-                week: weekName
+                incompleteCount: pCount,
+                status: pCount === 0 ? 'Complete' : 'Incomplete',
+                week: weekLabel
             };
         }
 
