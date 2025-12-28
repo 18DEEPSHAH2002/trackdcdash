@@ -2,196 +2,145 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Officer Task Status Dashboard</title>
+    <title>Master Officer Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
         h1 { color: #2c3e50; text-align: center; }
-        h3 { border-bottom: 2px solid #0d6efd; padding-bottom: 5px; color: #0d6efd; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #dee2e6; padding: 12px; font-size: 14px; text-align: center; }
-        th { background: #343a40; color: white; text-transform: uppercase; letter-spacing: 1px; }
-        tr:nth-child(even) { background-color: #f8f9fa; }
-        .status-incomplete { color: #dc3545; font-weight: bold; }
-        .status-complete { color: #198754; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        #loading { text-align: center; font-weight: bold; color: #0d6efd; padding: 20px; font-size: 1.2em; }
-        .info { margin-top: 20px; padding: 15px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; }
+        .dashboard-container { display: flex; flex-direction: column; gap: 30px; }
+        .top-row { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: center; font-size: 13px; }
+        th { background: #343a40; color: white; }
+        .status-incomplete { background-color: #ffdce0; color: #d93025; font-weight: bold; }
+        .status-complete { background-color: #e6f4ea; color: #1e8e3e; font-weight: bold; }
+        #loading { text-align: center; font-size: 1.2em; color: #0d6efd; padding: 50px; }
+        .chart-container { height: 400px; width: 100%; }
     </style>
 </head>
 <body>
 
-<h1>📊 Master Dashboard – Officer Task Status</h1>
+<h1>📊 Master Dashboard – All Officers & SDMs</h1>
 
-<div id="loading">⏳ Fetching latest data from all Officer Sheets...</div>
+<div id="loading">⏳ Fetching live data from all sheets...</div>
 
-<div class="grid">
-    <div>
-        <h3>📋 Weekly Status Summary</h3>
-        <table id="weeklyTable">
-            </table>
+<div id="mainContent" class="dashboard-container" style="display:none;">
+    
+    <div class="card">
+        <h3>📈 Task Performance Graph</h3>
+        <div class="chart-container">
+            <canvas id="taskChart"></canvas>
+        </div>
     </div>
-    <div>
-        <h3>⭐ Star-Mark Summary</h3>
-        <table id="starTable"></table>
+
+    <div class="top-row">
+        <div class="card">
+            <h3>📋 Detailed Status Table</h3>
+            <table id="weeklyTable"></table>
+        </div>
+
+        <div class="card">
+            <h3>⭐ Star-Mark Summary</h3>
+            <table id="starTable"></table>
+        </div>
     </div>
-</div>
-
-<h3>⚖️ Upcoming Court Cases</h3>
-<table id="courtTable"></table>
-
-<div class="info">
-    <strong>Logic:</strong> If any single task in an officer's sheet is marked <em>Incomplete</em> or <em>Pending</em>, the <strong>Overall Status</strong> is marked as <strong>Incomplete</strong>.
 </div>
 
 <script>
 /* --------------------------------------------------
-CONFIG: ALL OFFICERS ADDED
+CONFIG: FULL OFFICER LIST
 -------------------------------------------------- */
+const BASE_SID = "1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok";
 const OFFICER_SHEETS = {
-    "ADC G": "174981592",
-    "ADC D": "537074213",
-    "ADC (UD)": "846764018",
-    "ADC K": "1476602908",
-    "ADC J": "18822170",
-    "ACG": "1291568180",
-    "CMFO": "1227420096",
-    "SDM East": "33416154",
-    "SDM West": "52989510",
-    "SDM Raikot": "1833732603",
-    "SDM Samrala": "190794459",
-    "SDM Khanna": "2054147547",
-    "SDM Jargon": "278920499",
-    "SDM Payal": "778489712",
-    "DRO": "501565659",
-    "RTA": "1563439729"
+    "ADC G": "174981592", "ADC D": "537074213", "ADC (UD)": "846764018",
+    "ADC K": "1476602908", "ADC J": "18822170", "ACG": "1291568180",
+    "CMFO": "1227420096", "SDM East": "33416154", "SDM West": "52989510",
+    "SDM Raikot": "1833732603", "SDM Samrala": "190794459", "SDM Khanna": "2054147547",
+    "SDM Jagraon": "278920499", "SDM Payal": "778489712", "DRO": "501565659", "RTA": "1563439729"
 };
 
-const BASE_SID = "1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok";
-const STAR_URL = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534";
-const COURT_URL = "https://docs.google.com/spreadsheets/d/1VUnD7ySFzIkeZlaq8E5XG8r2xXcos6lhIt62QZEeHKs/export?format=csv&gid=0";
-
 /* --------------------------------------------------
-HELPERS
+DATA PROCESSING
 -------------------------------------------------- */
-function csvToArray(csv) {
-    // Simple CSV parser that handles basic commas
-    return csv.trim().split("\n").map(r => r.split(","));
-}
-
-function renderTable(id, headers, rows) {
-    let html = "<thead><tr>" + headers.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
-    rows.forEach(r => {
-        html += "<tr>" + r.map((c, index) => {
-            let className = "";
-            if (c === "Incomplete") className = "class='status-incomplete'";
-            if (c === "Complete") className = "class='status-complete'";
-            return `<td ${className}>${c}</td>`;
-        }).join("") + "</tr>";
-    });
-    html += "</tbody>";
-    document.getElementById(id).innerHTML = html;
-}
-
-/* --------------------------------------------------
-MAIN LOGIC: WEEKLY STATUS
--------------------------------------------------- */
-async function loadWeekly() {
-    const rows = [];
+async function loadData() {
+    const tableData = [];
+    const labels = [];
+    const incompleteData = [];
+    const completeData = [];
 
     for (const officer in OFFICER_SHEETS) {
         try {
             const gid = OFFICER_SHEETS[officer];
             const url = `https://docs.google.com/spreadsheets/d/${BASE_SID}/export?format=csv&gid=${gid}`;
             const response = await fetch(url);
-            const data = csvToArray(await response.text());
+            const text = await response.text();
+            const rows = text.split("\n").map(r => r.split(","));
 
-            // 1. Find the "Status" column (Scanning top 10 rows)
+            // Auto-detect "Status" column
             let statusCol = -1;
             for (let i = 0; i < 10; i++) {
-                if (data[i]) {
-                    const foundIndex = data[i].findIndex(h => h.toLowerCase().trim() === "status");
-                    if (foundIndex !== -1) {
-                        statusCol = foundIndex;
-                        break;
-                    }
+                if (rows[i]) {
+                    const idx = rows[i].findIndex(c => c.toLowerCase().trim().includes("status"));
+                    if (idx !== -1) { statusCol = idx; break; }
                 }
             }
 
-            let incompleteCount = 0;
-            let completeCount = 0;
-
-            // 2. Process rows (Skipping headers)
-            // We assume data starts after row 3 based on your "Sr. No" structure
-            data.slice(3).forEach(r => {
-                if (statusCol === -1 || !r[statusCol]) return;
-                
-                const val = r[statusCol].toLowerCase().trim();
-                if (val.includes("incomplete") || val.includes("pending")) {
-                    incompleteCount++;
-                } else if (val.includes("complete")) {
-                    completeCount++;
-                }
+            let inc = 0, com = 0;
+            rows.slice(2).forEach(r => {
+                const val = (r[statusCol] || "").toLowerCase().trim();
+                if (val.includes("incomplete") || val.includes("pending")) inc++;
+                else if (val.includes("complete")) com++;
             });
 
-            // 3. Determine Overall Status
-            // Logic: If even 1 is incomplete, overall is incomplete.
-            const overallStatus = incompleteCount > 0 ? "Incomplete" : (completeCount > 0 ? "Complete" : "No Tasks");
-
-            rows.push([officer, overallStatus, incompleteCount, completeCount]);
+            const overall = inc > 0 ? "Incomplete" : (com > 0 ? "Complete" : "No Tasks");
+            
+            tableData.push([officer, overall, inc, com]);
+            labels.push(officer);
+            incompleteData.push(inc);
+            completeData.push(com);
 
         } catch (e) {
-            console.error(`Error loading ${officer}:`, e);
-            rows.push([officer, "Error Loading", "-", "-"]);
+            console.error(e);
+            tableData.push([officer, "Error", 0, 0]);
         }
     }
 
-    renderTable("weeklyTable", 
-        ["Officer Name", "Overall Status", "No. of Tasks Incomplete", "No. of Tasks Completed"], 
-        rows
-    );
+    renderUI(tableData, labels, incompleteData, completeData);
 }
 
-// ... (Star and Court logic remain similar but with updated error handling) ...
-async function loadStar() {
-    try {
-        const response = await fetch(STAR_URL);
-        const data = csvToArray(await response.text());
-        const headers = data[0];
-        const rows = data.slice(1);
-        const map = {};
+function renderUI(tableData, labels, incompleteData, completeData) {
+    // 1. Render Table
+    let html = `<tr><th>Officer Name</th><th>Overall Status</th><th>Incomplete</th><th>Completed</th></tr>`;
+    tableData.forEach(row => {
+        const statusClass = row[1] === "Incomplete" ? "status-incomplete" : (row[1] === "Complete" ? "status-complete" : "");
+        html += `<tr><td>${row[0]}</td><td class="${statusClass}">${row[1]}</td><td>${row[2]}</td><td>${row[3]}</td></tr>`;
+    });
+    document.getElementById("weeklyTable").innerHTML = html;
 
-        const officerIdx = headers.indexOf("Marked to Officer");
-        const statusIdx = headers.indexOf("Status");
+    // 2. Render Graph
+    const ctx = document.getElementById('taskChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Incomplete Tasks', data: incompleteData, backgroundColor: '#d93025' },
+                { label: 'Completed Tasks', data: completeData, backgroundColor: '#1e8e3e' }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: { y: { beginAtZero: true } }
+        }
+    });
 
-        rows.forEach(r => {
-            const officer = r[officerIdx];
-            if (!officer) return;
-            const status = (r[statusIdx] || "").toLowerCase().trim();
-            if (!map[officer]) map[officer] = {completed:0, pending:0};
-            if (status === "completed") map[officer].completed++;
-            else map[officer].pending++;
-        });
-
-        const tableRows = Object.entries(map).map(([k,v]) => [k, v.completed, v.pending]);
-        renderTable("starTable", ["Marked to Officer", "Completed", "Pending Tasks"], tableRows);
-    } catch (e) { console.error("Star loading error", e); }
-}
-
-async function loadCourt() {
-    try {
-        const response = await fetch(COURT_URL);
-        const data = csvToArray(await response.text());
-        const rows = data.slice(1).slice(0, 10); // Show top 10 upcoming
-        const filtered = rows.map(r => [r[2], r[5], r[6]]); // Adjusting indices for Name, Date, Court
-        renderTable("courtTable", ["Officer", "Date", "Court Name"], filtered);
-    } catch (e) { console.error("Court loading error", e); }
-}
-
-// Initializing
-Promise.all([loadWeekly(), loadStar(), loadCourt()]).then(() => {
     document.getElementById("loading").style.display = "none";
-});
-</script>
+    document.getElementById("mainContent").style.display = "block";
+}
 
+loadData();
+</script>
 </body>
 </html>
