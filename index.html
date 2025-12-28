@@ -103,7 +103,7 @@ function renderTable(id, headers, rows) {
 }
 
 /* --------------------------------------------------
-WEEKLY STATUS LOGIC (UNCHANGED)
+FIXED WEEKLY STATUS LOGIC
 -------------------------------------------------- */
 
 async function loadWeekly() {
@@ -113,19 +113,35 @@ async function loadWeekly() {
         try {
             const [sid, gid] = OFFICER_SHEETS[officer];
             const url = `https://docs.google.com/spreadsheets/d/${sid}/export?format=csv&gid=${gid}`;
-            const data = csvToArray(await (await fetch(url)).text());
+            const response = await fetch(url);
+            const csvText = await response.text();
+            const data = csvToArray(csvText);
 
+            // 1. Find the "Status" column index (searching the first 5 rows)
             let statusCol = -1;
-            for (let c = 0; c < data[0].length; c++) {
-                const head = data.slice(0, 10).map(r => (r[c] || "").toLowerCase());
-                if (head.some(v => v.includes("status"))) statusCol = c;
+            for (let r = 0; r < 5; r++) {
+                if (!data[r]) continue;
+                const index = data[r].findIndex(cell => 
+                    cell.toLowerCase().trim().includes("status")
+                );
+                if (index !== -1) {
+                    statusCol = index;
+                    break;
+                }
             }
 
             let pending = 0, completed = 0;
-            data.slice(10).forEach(r => {
-                const v = (r[statusCol] || "").toLowerCase();
-                if (v.includes("pending") || v.includes("incomplete")) pending++;
-                if (v.includes("complete")) completed++;
+
+            // 2. Start from data[2] (Row 3) to capture "e-Sewa" and "m-Sewa"
+            // We ignore empty rows to prevent false counts
+            data.slice(2).forEach(r => {
+                const statusValue = (r[statusCol] || "").toLowerCase().trim();
+                
+                if (statusValue === "pending" || statusValue === "incomplete") {
+                    pending++;
+                } else if (statusValue === "completed") {
+                    completed++;
+                }
             });
 
             rows.push([
@@ -135,7 +151,8 @@ async function loadWeekly() {
                 completed
             ]);
 
-        } catch {
+        } catch (error) {
+            console.error(`Error loading ${officer}:`, error);
             rows.push([officer, "Error", "-", "-"]);
         }
     }
@@ -145,7 +162,6 @@ async function loadWeekly() {
         rows
     );
 }
-
 /* --------------------------------------------------
 STAR MARK LOGIC
 -------------------------------------------------- */
