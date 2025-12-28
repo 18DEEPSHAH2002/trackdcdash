@@ -100,7 +100,7 @@
                     <ul class="text-xs space-y-3 mt-4 text-slate-300">
                         <li class="flex gap-2"><i class="fas fa-info-circle text-blue-400"></i> <b>Pending:</b> Any cell containing the word <span class="text-red-400 font-bold">"pending"</span> is counted.</li>
                         <li class="flex gap-2"><i class="fas fa-check-circle text-green-400"></i> <b>Complete:</b> Everything else (including "completed" or empty cells) is considered complete.</li>
-                        <li class="flex gap-2"><i class="fas fa-search text-yellow-400"></i> <b>Scanning:</b> The script reads the entire height of the sheet to ensure no rows are missed.</li>
+                        <li class="flex gap-2"><i class="fas fa-search text-yellow-400"></i> <b>Scanning:</b> Improved row detection ensures no pendency is missed from the status column.</li>
                     </ul>
                 </div>
             </div>
@@ -154,7 +154,7 @@
         }
 
         /**
-         * Robust CSV line parser
+         * Enhanced CSV line parser to handle complex quotes
          */
         function parseCsvLine(line) {
             const result = [];
@@ -162,8 +162,14 @@
             let inQuotes = false;
             for (let i = 0; i < line.length; i++) {
                 const char = line[i];
-                if (char === '"') inQuotes = !inQuotes;
-                else if (char === ',' && !inQuotes) {
+                if (char === '"') {
+                    if (inQuotes && line[i+1] === '"') {
+                        current += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (char === ',' && !inQuotes) {
                     result.push(current.trim());
                     current = '';
                 } else {
@@ -176,47 +182,46 @@
 
         function analyzeSheet(csv) {
             // Split rows and filter out true empty rows
-            const rows = csv.split(/\r?\n/).filter(line => line.trim() !== "").map(line => parseCsvLine(line));
+            const rawRows = csv.split(/\r?\n/).filter(line => line.trim() !== "");
+            const rows = rawRows.map(line => parseCsvLine(line));
             
             if (rows.length < 2) return { incompleteCount: 0, status: 'Empty', week: 'Unknown' };
 
             const header = rows[0];
             
             // 1. Detect the LATEST Status Column
-            // Search right-to-left for a column that contains any text like "pending" or "completed"
+            // Search right-to-left for a column that contains keywords "pending" or "completed"
+            // This ensures we always get the latest week with data even if there are extra empty columns
             let targetCol = -1;
             for (let c = header.length - 1; c >= 2; c--) {
-                const columnHasStatusMarkers = rows.slice(1).some(r => {
+                const columnHasData = rows.slice(1).some(r => {
                     const val = (r[c] || "").toLowerCase();
                     return val.includes("pending") || val.includes("completed");
                 });
-                if (columnHasStatusMarkers) {
+                if (columnHasData) {
                     targetCol = c;
                     break;
                 }
             }
 
-            // Fallback: if no clear markers found, use the last column that has any non-empty header
+            // Fallback to the very last column if detection fails
             if (targetCol === -1) {
                 targetCol = header.length - 1;
                 while (targetCol > 1 && (!header[targetCol] || header[targetCol].trim() === "")) targetCol--;
             }
 
             let pendingCount = 0;
-            const weekLabel = header[targetCol] || "Current Week";
+            const weekLabel = header[targetCol] || "Latest Week";
 
-            // 2. Scan every row
+            // 2. Scan every row to find "pending"
             for (let i = 1; i < rows.length; i++) {
                 const row = rows[i];
-                const status = (row[targetCol] || "").toLowerCase().trim();
+                // Column 1 is usually the Task Name
                 const taskName = row[1] || "";
+                const status = (row[targetCol] || "").toLowerCase().trim();
 
-                // If the status is empty and task name is empty, it's a padding row
-                if (!status && !taskName) continue;
-
-                // STRICT USER LOGIC:
-                // Only if the status text contains "pending" -> count it.
-                // Otherwise treat as complete.
+                // If the row has no task name, check if it's just a blank row or footer
+                // We count it if status says "pending" even if task name is technically empty
                 if (status.includes("pending")) {
                     pendingCount++;
                 }
