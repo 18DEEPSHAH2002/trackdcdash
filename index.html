@@ -4,49 +4,23 @@
 <meta charset="UTF-8">
 <title>Officer Task Status Dashboard</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        margin: 20px;
-        background: #f8f9fa;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f8f9fa; }
     h1 { margin-bottom: 5px; }
     h3 { margin-top: 30px; }
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 10px;
-        background: white;
-    }
-    th, td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        font-size: 14px;
-        text-align: center;
-    }
-    th {
-        background: #343a40;
-        color: white;
-    }
-    .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-    }
-    .info {
-        margin-top: 20px;
-        padding: 10px;
-        background: #e9ecef;
-        border-left: 5px solid #0d6efd;
-    }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
+    th, td { border: 1px solid #ddd; padding: 8px; font-size: 14px; text-align: center; }
+    th { background: #343a40; color: white; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .info { margin-top: 20px; padding: 10px; background: #e9ecef; border-left: 5px solid #0d6efd; }
+    #loading { font-weight: bold; color: #0d6efd; margin-bottom: 10px; }
 </style>
 </head>
-
 <body>
 
 <h1>📊 Master Dashboard – Officer Task Status</h1>
 <p>Weekly officer status + Star-mark task summary</p>
 
-<div id="loading">⏳ Loading data...</div>
+<div id="loading">⏳ Loading data from Google Sheets...</div>
 
 <div class="grid">
     <div>
@@ -71,7 +45,6 @@
 /* --------------------------------------------------
 CONFIG
 -------------------------------------------------- */
-
 const OFFICER_SHEETS = {
     "ADC G": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "174981592"],
     "ADC D": ["1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok", "537074213"],
@@ -83,13 +56,11 @@ const OFFICER_SHEETS = {
 };
 
 const STAR_URL = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534";
-
 const COURT_URL = "https://docs.google.com/spreadsheets/d/1VUnD7ySFzIkeZlaq8E5XG8r2xXcos6lhIt62QZEeHKs/export?format=csv&gid=0";
 
 /* --------------------------------------------------
 HELPERS
 -------------------------------------------------- */
-
 function csvToArray(csv) {
     return csv.trim().split("\n").map(r => r.split(","));
 }
@@ -105,7 +76,6 @@ function renderTable(id, headers, rows) {
 /* --------------------------------------------------
 FIXED WEEKLY STATUS LOGIC
 -------------------------------------------------- */
-
 async function loadWeekly() {
     const rows = [];
 
@@ -114,45 +84,47 @@ async function loadWeekly() {
             const [sid, gid] = OFFICER_SHEETS[officer];
             const url = `https://docs.google.com/spreadsheets/d/${sid}/export?format=csv&gid=${gid}`;
             const response = await fetch(url);
-            const csvText = await response.text();
-            const data = csvToArray(csvText);
+            const data = csvToArray(await response.text());
 
-            // 1. Find the "Status" column index (searching the first 5 rows)
+            // Find the "Status" column index by checking the header row (usually Row 2 / Index 1)
             let statusCol = -1;
-            for (let r = 0; r < 5; r++) {
-                if (!data[r]) continue;
-                const index = data[r].findIndex(cell => 
-                    cell.toLowerCase().trim().includes("status")
-                );
-                if (index !== -1) {
-                    statusCol = index;
-                    break;
+            // Scan the first 5 rows to be sure we find the "Status" header
+            for (let i = 0; i < 5; i++) {
+                if (data[i]) {
+                    const foundIndex = data[i].findIndex(h => h.toLowerCase().trim().includes("status"));
+                    if (foundIndex !== -1) {
+                        statusCol = foundIndex;
+                        break;
+                    }
                 }
             }
 
             let pending = 0, completed = 0;
 
-            // 2. Start from data[2] (Row 3) to capture "e-Sewa" and "m-Sewa"
-            // We ignore empty rows to prevent false counts
+            // Start slicing at index 2 (Row 3) to catch all data
             data.slice(2).forEach(r => {
-                const statusValue = (r[statusCol] || "").toLowerCase().trim();
+                if (statusCol === -1) return;
+                const v = (r[statusCol] || "").toLowerCase().trim();
                 
-                if (statusValue === "pending" || statusValue === "incomplete") {
+                // Count any row that contains 'pending' or 'incomplete'
+                if (v.includes("pending") || v.includes("incomplete")) {
                     pending++;
-                } else if (statusValue === "completed") {
+                } 
+                // Count any row that contains 'complete'
+                else if (v.includes("complete")) {
                     completed++;
                 }
             });
 
             rows.push([
                 officer,
-                pending > 0 ? "Incomplete" : "Complete",
+                pending > 0 ? "Incomplete" : (completed > 0 ? "Complete" : "No Tasks"),
                 pending,
                 completed
             ]);
 
-        } catch (error) {
-            console.error(`Error loading ${officer}:`, error);
+        } catch (e) {
+            console.error("Error loading " + officer, e);
             rows.push([officer, "Error", "-", "-"]);
         }
     }
@@ -162,75 +134,69 @@ async function loadWeekly() {
         rows
     );
 }
+
 /* --------------------------------------------------
 STAR MARK LOGIC
 -------------------------------------------------- */
-
 async function loadStar() {
-    const data = csvToArray(await (await fetch(STAR_URL)).text());
-    const headers = data[0];
-    const rows = data.slice(1);
+    try {
+        const data = csvToArray(await (await fetch(STAR_URL)).text());
+        const headers = data[0];
+        const rows = data.slice(1);
 
-    const dateIdx = headers.findIndex(h => h.toLowerCase().includes("date"));
-    const officerIdx = headers.indexOf("Marked to Officer");
-    const statusIdx = headers.indexOf("Status");
+        const dateIdx = headers.findIndex(h => h.toLowerCase().includes("date"));
+        const officerIdx = headers.indexOf("Marked to Officer");
+        const statusIdx = headers.indexOf("Status");
 
-    const last7 = new Date();
-    last7.setDate(last7.getDate() - 7);
+        const last7 = new Date();
+        last7.setDate(last7.getDate() - 7);
+        const map = {};
 
-    const map = {};
+        rows.forEach(r => {
+            const officer = r[officerIdx];
+            if (!officer) return;
+            const status = (r[statusIdx] || "").toLowerCase().trim();
+            const date = new Date(r[dateIdx]);
 
-    rows.forEach(r => {
-        const officer = r[officerIdx];
-        const status = (r[statusIdx] || "").toLowerCase();
-        const date = new Date(r[dateIdx]);
+            if (!map[officer]) map[officer] = {completed:0, pending:0};
+            if (status === "completed" && date >= last7) map[officer].completed++;
+            if (status !== "completed") map[officer].pending++;
+        });
 
-        if (!map[officer]) map[officer] = {completed:0, pending:0};
-
-        if (status === "completed" && date >= last7) map[officer].completed++;
-        if (status !== "completed") map[officer].pending++;
-    });
-
-    const tableRows = Object.entries(map).map(([k,v]) => [k, v.completed, v.pending]);
-
-    renderTable("starTable",
-        ["Marked to Officer", "Completed (Last 7 Days)", "Pending Tasks"],
-        tableRows
-    );
+        const tableRows = Object.entries(map).map(([k,v]) => [k, v.completed, v.pending]);
+        renderTable("starTable", ["Marked to Officer", "Completed (Last 7 Days)", "Pending Tasks"], tableRows);
+    } catch (e) { console.error("Star loading error", e); }
 }
 
 /* --------------------------------------------------
 COURT CASES LOGIC
 -------------------------------------------------- */
-
 async function loadCourt() {
-    const data = csvToArray(await (await fetch(COURT_URL)).text());
-    const headers = data[0];
-    const rows = data.slice(1);
+    try {
+        const data = csvToArray(await (await fetch(COURT_URL)).text());
+        const headers = data[0];
+        const rows = data.slice(1);
 
-    const o = headers.indexOf("Supervisior office");
-    const d = headers.indexOf("Next Hearing Date");
-    const c = headers.findIndex(h => h.includes("Name of Court"));
+        const o = headers.indexOf("Supervisior office");
+        const d = headers.indexOf("Next Hearing Date");
+        const c = headers.findIndex(h => h.includes("Name of Court"));
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
+        const today = new Date();
+        today.setHours(0,0,0,0);
 
-    const filtered = rows
-        .map(r => [r[o], new Date(r[d]), r[c]])
-        .filter(r => r[1] >= today)
-        .sort((a,b) => a[1] - b[1])
-        .map(r => [r[0], r[1].toISOString().split("T")[0], r[2]]);
+        const filtered = rows
+            .map(r => [r[o], new Date(r[d]), r[c]])
+            .filter(r => r[1] >= today)
+            .sort((a,b) => a[1] - b[1])
+            .map(r => [r[0], r[1].toISOString().split("T")[0], r[2]]);
 
-    renderTable("courtTable",
-        ["Name of the Officer", "Upcoming Hearing Date", "Name of Court"],
-        filtered
-    );
+        renderTable("courtTable", ["Name of the Officer", "Upcoming Hearing Date", "Name of Court"], filtered);
+    } catch (e) { console.error("Court loading error", e); }
 }
 
 /* --------------------------------------------------
 LOAD ALL
 -------------------------------------------------- */
-
 Promise.all([loadWeekly(), loadStar(), loadCourt()]).then(() => {
     document.getElementById("loading").style.display = "none";
 });
