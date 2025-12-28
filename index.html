@@ -96,8 +96,8 @@
                     </h4>
                     <ul class="text-xs space-y-3 text-slate-300">
                         <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Full Column Scan:</b> We look at every single row from row 1 to 500+.</li>
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Strict Status:</b> Any task not marked "Completed" or "Done" is counted as Incomplete.</li>
-                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Auto-Week:</b> Detects the right-most column header in your sheet.</li>
+                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Strict Status:</b> Any task not explicitly marked "Completed" or "Done" is counted as Incomplete.</li>
+                        <li class="flex gap-2"><i class="fas fa-check text-green-400"></i> <b>Auto-Week:</b> Detects the right-most column header in your sheet that contains non-empty data cells.</li>
                     </ul>
                 </div>
             </div>
@@ -141,6 +141,7 @@
                     const analysis = analyzeSheet(csvText);
                     results.push({ name: off.name, ...analysis });
                 } catch (e) {
+                    console.error(`Error processing ${off.name}:`, e);
                     results.push({ name: off.name, incompleteCount: 0, status: 'Error', week: 'N/A' });
                 }
             }
@@ -150,39 +151,55 @@
         }
 
         function analyzeSheet(csv) {
-            // Split by rows and handle CSV quoting
-            const rows = csv.split('\n').map(r => r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^"|"$/g, '')));
+            // Split by rows and handle CSV quoting correctly
+            const rows = csv.split('\n').map(r => {
+                // Improved CSV parser to handle quoted commas
+                const matches = r.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+                return (matches || []).map(c => c.trim().replace(/^"|"$/g, ''));
+            });
             
             if (rows.length < 2) return { incompleteCount: 0, status: 'Empty', week: 'Unknown' };
 
             const header = rows[0];
             
-            // 1. Find the LATEST Week Column (Last column that has a header AND data)
+            // 1. Find the LATEST Week Column
+            // We search from right to left for the first column that has:
+            // a) a header 
+            // b) at least one non-empty value in the rows below it
             let latestCol = header.length - 1;
-            while (latestCol > 2) {
-                const hasAnyData = rows.slice(1).some(r => r[latestCol] && r[latestCol].trim() !== "");
-                if (hasAnyData && header[latestCol]) break;
-                latestCol--;
+            let found = false;
+            while (latestCol > 1 && !found) {
+                const columnHasData = rows.slice(1).some(r => r[latestCol] && r[latestCol].trim() !== "");
+                if (header[latestCol] && header[latestCol].trim() !== "" && columnHasData) {
+                    found = true;
+                } else {
+                    latestCol--;
+                }
             }
+
+            // Fallback if no specific week column is found
+            if (latestCol <= 1) latestCol = header.length - 1;
 
             let icCount = 0;
             const weekName = header[latestCol] || "Current Week";
 
-            // 2. Iterate EVERY row
+            // 2. Iterate EVERY row to check task status
             for (let i = 1; i < rows.length; i++) {
                 const taskName = rows[i][1]; // Column B is usually Task Name
-                const status = (rows[i][latestCol] || "").toLowerCase();
+                const status = (rows[i][latestCol] || "").toLowerCase().trim();
 
-                // If no task name, ignore the row (likely end of sheet)
+                // If no task name, ignore the row (likely end of data)
                 if (!taskName || taskName.length < 2) continue;
 
                 // STRICT CRITERIA:
-                // Only "complete", "completed", "done", "yes" are considered successful.
-                // Everything else (including empty cells or "pending") is Incomplete.
-                const isDone = status.includes("complete") || 
-                               status.includes("done") || 
+                // Only "complete", "completed", "done", "yes" (and variants) are considered success.
+                // Any other text (like "pending", "no", "ic") OR an empty cell is Incomplete.
+                const isDone = status === "complete" || 
+                               status === "completed" || 
+                               status === "done" || 
                                status === "yes" || 
-                               status === "y";
+                               status === "y" ||
+                               status === "ok";
 
                 if (!isDone) {
                     icCount++;
@@ -207,7 +224,7 @@
             let stars = 0;
 
             // Set the week label from the first valid data point
-            const sample = data.find(d => d.week !== 'Unknown');
+            const sample = data.find(d => d.week && d.week !== 'Unknown');
             weekLabel.innerText = sample ? sample.week : "Active Week";
             document.getElementById('officerCount').innerText = `${data.length} Officers`;
 
@@ -233,7 +250,7 @@
                 table.appendChild(tr);
 
                 // Star Performer Row
-                if (!isIC && item.status !== 'Error') {
+                if (!isIC && item.status !== 'Error' && item.status !== 'Empty') {
                     stars++;
                     const div = document.createElement('div');
                     div.className = "star-item p-3 rounded-lg flex items-center justify-between border border-amber-200 shadow-sm";
@@ -267,7 +284,7 @@
                     }]
                 },
                 options: {
-                    ffresponsive: true,
+                    responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
