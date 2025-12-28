@@ -2,201 +2,326 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Officer Task Status Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Officer Task Monitoring Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; background: #f4f7f6; color: #333; }
-        h1 { color: #2c3e50; text-align: center; }
-        h3 { border-bottom: 2px solid #0d6efd; padding-bottom: 5px; color: #0d6efd; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        th, td { border: 1px solid #dee2e6; padding: 12px; font-size: 14px; text-align: center; }
-        th { background: #343a40; color: white; text-transform: uppercase; letter-spacing: 1px; }
-        tr:nth-child(even) { background-color: #f8f9fa; }
-        .status-incomplete { color: #dc3545; font-weight: bold; }
-        .status-complete { color: #198754; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        #loading { text-align: center; font-weight: bold; color: #0d6efd; padding: 20px; font-size: 1.2em; }
-        .info { margin-top: 20px; padding: 15px; background: #fff3cd; border-left: 5px solid #ffc107; border-radius: 4px; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 1); }
+        .status-badge { padding: 4px 12px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .status-complete { background-color: #dcfce7; color: #166534; }
+        .status-incomplete { background-color: #fee2e2; color: #991b1b; }
+        .loader { border-top-color: #3b82f6; animation: spinner 1.5s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
+<body class="p-4 md:p-8">
 
-<h1>📊 Master Dashboard – Officer Task Status</h1>
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900">Task Monitoring Dashboard</h1>
+                <p class="text-slate-500">Real-time status tracking across administrative offices</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button onclick="fetchAllData()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium transition-all flex items-center gap-2">
+                    <i class="fas fa-sync-alt"></i> Refresh Data
+                </button>
+                <div id="lastUpdate" class="text-xs text-slate-400 font-mono"></div>
+            </div>
+        </header>
 
-<div id="loading">⏳ Fetching latest data from all Officer Sheets...</div>
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="fixed inset-0 bg-white/80 z-50 flex flex-col items-center justify-center transition-opacity">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12 mb-4"></div>
+            <p class="text-slate-600 font-medium">Fetching data from Google Sheets...</p>
+            <p id="loadingProgress" class="text-slate-400 text-sm mt-1">0/16 processed</p>
+        </div>
 
-<div class="grid">
-    <div>
-        <h3>📋 Weekly Status Summary</h3>
-        <table id="weeklyTable">
-            </table>
+        <!-- Stats Overview -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="glass-card p-6 rounded-2xl shadow-sm">
+                <p class="text-sm font-medium text-slate-500 mb-1">Total Officers</p>
+                <h3 id="statTotal" class="text-2xl font-bold text-slate-800">0</h3>
+            </div>
+            <div class="glass-card p-6 rounded-2xl shadow-sm border-l-4 border-red-500">
+                <p class="text-sm font-medium text-slate-500 mb-1">Incomplete Status</p>
+                <h3 id="statIncomplete" class="text-2xl font-bold text-red-600">0</h3>
+            </div>
+            <div class="glass-card p-6 rounded-2xl shadow-sm border-l-4 border-green-500">
+                <p class="text-sm font-medium text-slate-500 mb-1">Fully Complete</p>
+                <h3 id="statComplete" class="text-2xl font-bold text-green-600">0</h3>
+            </div>
+            <div class="glass-card p-6 rounded-2xl shadow-sm">
+                <p class="text-sm font-medium text-slate-500 mb-1">Total Pending Tasks</p>
+                <h3 id="statTasks" class="text-2xl font-bold text-slate-800">0</h3>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Main Table Section -->
+            <div class="lg:col-span-2 space-y-8">
+                <div class="glass-card rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-800">Officer Status Report</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-50/50">
+                                <tr>
+                                    <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase">Officer Name</th>
+                                    <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Status</th>
+                                    <th class="px-6 py-4 text-xs font-semibold text-slate-500 uppercase text-center">Incomplete Tasks</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mainTableBody" class="divide-y divide-slate-100">
+                                <!-- Data injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Graph Section -->
+                <div class="glass-card rounded-2xl shadow-sm p-6">
+                    <h2 class="text-lg font-bold text-slate-800 mb-6">Task Distribution</h2>
+                    <div class="h-[300px]">
+                        <canvas id="taskChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side Table: Star Marks -->
+            <div class="lg:col-span-1">
+                <div class="glass-card rounded-2xl shadow-sm overflow-hidden">
+                    <div class="p-6 border-b border-slate-100 bg-amber-50/30">
+                        <h2 class="text-lg font-bold text-amber-800 flex items-center gap-2">
+                            <i class="fas fa-star text-amber-500"></i> Star Performers
+                        </h2>
+                        <p class="text-xs text-amber-700 mt-1">Officers with 100% completion</p>
+                    </div>
+                    <div class="p-2">
+                        <ul id="starTableBody" class="space-y-1">
+                            <!-- Star performers injected here -->
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Help Info -->
+                <div class="mt-6 p-6 bg-blue-50 rounded-2xl border border-blue-100 text-sm text-blue-800">
+                    <h4 class="font-bold mb-2"><i class="fas fa-info-circle"></i> Data Logic</h4>
+                    <p class="mb-2">This dashboard scans the latest rows of each officer's sheet.</p>
+                    <ul class="list-disc ml-4 space-y-1">
+                        <li><strong>Status:</strong> Marked "Incomplete" if any single task is incomplete.</li>
+                        <li><strong>Star:</strong> Awarded only for zero incomplete tasks.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
-    <div>
-        <h3>⭐ Star-Mark Summary</h3>
-        <table id="starTable"></table>
-    </div>
-</div>
 
-<h3>⚖️ Upcoming Court Cases</h3>
-<table id="courtTable"></table>
+    <script>
+        const SHEET_ID = '1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok';
+        
+        // Configuration: Map GIDs to names
+        const officers = [
+            { name: "ADC G", gid: "174981592" },
+            { name: "ADC D", gid: "537074213" },
+            { name: "ADC UD", gid: "846764018" },
+            { name: "ADC K", gid: "1476602908" },
+            { name: "ADC J", gid: "18822170" },
+            { name: "ACG", gid: "1291568180" },
+            { name: "CMFO", gid: "1227420096" },
+            { name: "SDM East", gid: "33416154" },
+            { name: "SDM West", gid: "52989510" },
+            { name: "SDM Raikot", gid: "1833732603" },
+            { name: "SDM Samrala", gid: "190794459" },
+            { name: "SDM Khanna", gid: "2054147547" },
+            { name: "SDM Jargon", gid: "278920499" },
+            { name: "SDM Payal", gid: "778489712" },
+            { name: "DRO", gid: "501565659" },
+            { name: "RTA", gid: "1563439729" }
+        ];
 
-<div class="info">
-    <strong>Logic:</strong> If any single task in an officer's sheet is marked <em>Incomplete</em> or <em>Pending</em>, the <strong>Overall Status</strong> is marked as <strong>Incomplete</strong>.
-</div>
+        let chartInstance = null;
 
-<script>
-/* --------------------------------------------------
-CONFIG: ALL OFFICERS ADDED
--------------------------------------------------- */
-const OFFICER_SHEETS = {
-    "ADC G": "174981592",
-    "ADC D": "537074213",
-    "ADC (UD)": "846764018",
-    "ADC K": "1476602908",
-    "ADC J": "18822170",
-    "ACG": "1291568180",
-    "CMFO": "1227420096",
-    "SDM East": "33416154",
-    "SDM West": "52989510",
-    "SDM Raikot": "1833732603",
-    "SDM Samrala": "190794459",
-    "SDM Khanna": "2054147547",
-    "SDM Jargon": "278920499",
-    "SDM Payal": "778489712",
-    "DRO": "501565659",
-    "RTA": "1563439729"
-};
+        async function fetchSheetData(gid) {
+            const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}`;
+            try {
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('Sheet Restricted');
+                const text = await response.text();
+                return parseCSV(text);
+            } catch (err) {
+                console.error(`Error fetching GID ${gid}:`, err);
+                return null;
+            }
+        }
 
-const BASE_SID = "1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok";
-const STAR_URL = "https://docs.google.com/spreadsheets/d/14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI/export?format=csv&gid=213021534";
-const COURT_URL = "https://docs.google.com/spreadsheets/d/1VUnD7ySFzIkeZlaq8E5XG8r2xXcos6lhIt62QZEeHKs/export?format=csv&gid=0";
+        function parseCSV(csvText) {
+            const rows = csvText.split('\n').map(row => row.split(',').map(cell => cell.trim().toLowerCase()));
+            if (rows.length < 2) return { status: 'Unknown', incompleteCount: 0 };
 
-/* --------------------------------------------------
-HELPERS
--------------------------------------------------- */
-function csvToArray(csv) {
-    // Simple CSV parser that handles basic commas
-    return csv.trim().split("\n").map(r => r.split(","));
-}
-
-function renderTable(id, headers, rows) {
-    let html = "<thead><tr>" + headers.map(h => `<th>${h}</th>`).join("") + "</tr></thead><tbody>";
-    rows.forEach(r => {
-        html += "<tr>" + r.map((c, index) => {
-            let className = "";
-            if (c === "Incomplete") className = "class='status-incomplete'";
-            if (c === "Complete") className = "class='status-complete'";
-            return `<td ${className}>${c}</td>`;
-        }).join("") + "</tr>";
-    });
-    html += "</tbody>";
-    document.getElementById(id).innerHTML = html;
-}
-
-/* --------------------------------------------------
-FIXED WEEKLY STATUS LOGIC (With Debugging)
--------------------------------------------------- */
-async function loadWeekly() {
-    const rows = [];
-
-    for (const officer in OFFICER_SHEETS) {
-        try {
-            const gid = OFFICER_SHEETS[officer];
-            const url = `https://docs.google.com/spreadsheets/d/${BASE_SID}/export?format=csv&gid=${gid}`;
-            const response = await fetch(url);
-            const data = csvToArray(await response.text());
-
-            // Find the "Status" column index
-            let statusCol = -1;
-            for (let i = 0; i < 10; i++) {
-                if (data[i]) {
-                    const foundIndex = data[i].findIndex(h => h.toLowerCase().trim().includes("status"));
-                    if (foundIndex !== -1) {
-                        statusCol = foundIndex;
-                        break;
+            // Find columns indices (assuming standard column names or searching for 'status')
+            const header = rows[0];
+            const statusIdx = header.findIndex(h => h.includes('status'));
+            
+            // Logic: Check all rows for "incomplete"
+            // If any one task is incomplete, status = incomplete
+            let incompleteCount = 0;
+            
+            // Iterate from bottom to top or all rows to count
+            // Taking 'new week data' as all data in the sheet for this version
+            for(let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (statusIdx !== -1) {
+                    const statusValue = row[statusIdx] || '';
+                    if (statusValue.includes('incomplete') || statusValue === 'no' || statusValue === 'pending') {
+                        incompleteCount++;
+                    }
+                } else {
+                    // Fallback: search whole row for 'incomplete'
+                    if (row.some(cell => cell.includes('incomplete'))) {
+                        incompleteCount++;
                     }
                 }
             }
 
-            let pending = 0, completed = 0;
+            return {
+                status: incompleteCount > 0 ? 'Incomplete' : 'Complete',
+                incompleteCount: incompleteCount
+            };
+        }
 
-            // Start scanning from Row 3 to catch all tasks
-            data.slice(2).forEach((r, index) => {
-                if (statusCol === -1 || !r[statusCol]) return;
-                
-                const v = r[statusCol].toLowerCase().trim();
-                
-                if (v === "pending" || v === "incomplete") {
-                    pending++;
-                } else if (v === "complete") {
-                    completed++;
-                }
-            });
+        async function fetchAllData() {
+            const overlay = document.getElementById('loadingOverlay');
+            const progress = document.getElementById('loadingProgress');
+            overlay.classList.remove('opacity-0', 'pointer-events-none');
+            
+            const results = [];
+            let processed = 0;
 
-            // Special Debug for ADC G to see if it catches the tasks
-            if(officer === "ADC G") {
-                console.log("ADC G Raw Data Scan:", {pending, completed});
+            for (const officer of officers) {
+                const data = await fetchSheetData(officer.gid);
+                results.push({
+                    name: officer.name,
+                    ...(data || { status: 'Error', incompleteCount: 0 })
+                });
+                processed++;
+                progress.innerText = `${processed}/${officers.length} processed`;
             }
 
-            rows.push([
-                officer,
-                pending > 0 ? "Incomplete" : (completed > 0 ? "Complete" : "No Tasks"),
-                pending,
-                completed
-            ]);
-
-        } catch (e) {
-            console.error("Error loading " + officer, e);
-            rows.push([officer, "Error", "-", "-"]);
+            updateUI(results);
+            overlay.classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('lastUpdate').innerText = `LAST SYNC: ${new Date().toLocaleTimeString()}`;
         }
-    }
 
-    renderTable("weeklyTable",
-        ["Officer Name", "Overall Status", "No. of Tasks Incomplete", "No. of Tasks Completed"],
-        rows
-    );
-}
+        function updateUI(data) {
+            const tableBody = document.getElementById('mainTableBody');
+            const starBody = document.getElementById('starTableBody');
+            tableBody.innerHTML = '';
+            starBody.innerHTML = '';
 
-// ... (Star and Court logic remain similar but with updated error handling) ...
-async function loadStar() {
-    try {
-        const response = await fetch(STAR_URL);
-        const data = csvToArray(await response.text());
-        const headers = data[0];
-        const rows = data.slice(1);
-        const map = {};
+            let totalIncomplete = 0;
+            let completeCount = 0;
+            let taskSum = 0;
 
-        const officerIdx = headers.indexOf("Marked to Officer");
-        const statusIdx = headers.indexOf("Status");
+            data.forEach(item => {
+                // Main Table Row
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-50/50 transition-colors';
+                
+                const statusClass = item.status === 'Complete' ? 'status-complete' : 'status-incomplete';
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4">
+                        <div class="font-semibold text-slate-800">${item.name}</div>
+                        <div class="text-xs text-slate-400">Department Head</div>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="status-badge ${statusClass}">${item.status}</span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <span class="font-mono font-bold ${item.incompleteCount > 0 ? 'text-red-500' : 'text-slate-400'}">
+                            ${item.incompleteCount}
+                        </span>
+                    </td>
+                `;
+                tableBody.appendChild(row);
 
-        rows.forEach(r => {
-            const officer = r[officerIdx];
-            if (!officer) return;
-            const status = (r[statusIdx] || "").toLowerCase().trim();
-            if (!map[officer]) map[officer] = {completed:0, pending:0};
-            if (status === "completed") map[officer].completed++;
-            else map[officer].pending++;
-        });
+                // Star Table Logic
+                if (item.status === 'Complete' && item.name !== 'Error') {
+                    const li = document.createElement('li');
+                    li.className = 'flex items-center justify-between p-3 rounded-xl hover:bg-amber-50 transition-colors group';
+                    li.innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-600">
+                                <i class="fas fa-medal"></i>
+                            </div>
+                            <span class="font-medium text-slate-700">${item.name}</span>
+                        </div>
+                        <i class="fas fa-certificate text-amber-400 opacity-0 group-hover:opacity-100 transition-opacity"></i>
+                    `;
+                    starBody.appendChild(li);
+                    completeCount++;
+                }
 
-        const tableRows = Object.entries(map).map(([k,v]) => [k, v.completed, v.pending]);
-        renderTable("starTable", ["Marked to Officer", "Completed", "Pending Tasks"], tableRows);
-    } catch (e) { console.error("Star loading error", e); }
-}
+                if (item.status === 'Incomplete') totalIncomplete++;
+                taskSum += item.incompleteCount;
+            });
 
-async function loadCourt() {
-    try {
-        const response = await fetch(COURT_URL);
-        const data = csvToArray(await response.text());
-        const rows = data.slice(1).slice(0, 10); // Show top 10 upcoming
-        const filtered = rows.map(r => [r[2], r[5], r[6]]); // Adjusting indices for Name, Date, Court
-        renderTable("courtTable", ["Officer", "Date", "Court Name"], filtered);
-    } catch (e) { console.error("Court loading error", e); }
-}
+            // Update Stats
+            document.getElementById('statTotal').innerText = data.length;
+            document.getElementById('statIncomplete').innerText = totalIncomplete;
+            document.getElementById('statComplete').innerText = completeCount;
+            document.getElementById('statTasks').innerText = taskSum;
 
-// Initializing
-Promise.all([loadWeekly(), loadStar(), loadCourt()]).then(() => {
-    document.getElementById("loading").style.display = "none";
-});
-</script>
+            updateChart(data);
+        }
 
+        function updateChart(data) {
+            const ctx = document.getElementById('taskChart').getContext('2d');
+            
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: data.map(d => d.name),
+                    datasets: [{
+                        label: 'Incomplete Tasks',
+                        data: data.map(d => d.incompleteCount),
+                        backgroundColor: data.map(d => d.incompleteCount > 0 ? '#ef4444' : '#10b981'),
+                        borderRadius: 6,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            grid: { display: false },
+                            ticks: { precision: 0 }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 10 } }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Initialize on load
+        window.onload = fetchAllData;
+    </script>
 </body>
 </html>
