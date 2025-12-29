@@ -1,582 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Officer Task Dashboard - Ludhiana</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Officer Task Dashboard – Ludhiana</title>
 
-        * {
-            font-family: 'Inter', sans-serif;
-        }
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .glass-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-        }
-
-        .status-badge-completed {
-            background: linear-gradient(135deg, #10b981, #059669);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            display: inline-block;
-        }
-
-        .status-badge-pending {
-            background: linear-gradient(135deg, #ef4444, #dc2626);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            display: inline-block;
-        }
-
-        .star-badge {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-            padding: 8px 14px;
-            border-radius: 12px;
-            font-size: 0.85rem;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
-        }
-
-        .kpi-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 12px;
-            text-align: center;
-        }
-
-        .kpi-value {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin: 10px 0;
-        }
-
-        .kpi-label {
-            font-size: 0.85rem;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .animate-spin {
-            animation: spin 1s linear infinite;
-        }
-
-        .table-row-pending {
-            background: rgba(239, 68, 68, 0.05);
-            border-left: 4px solid #ef4444;
-        }
-
-        .table-row-completed {
-            background: rgba(16, 185, 129, 0.05);
-            border-left: 4px solid #10b981;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 14px;
-            text-align: left;
-            font-weight: 700;
-            text-transform: uppercase;
-            font-size: 0.75rem;
-            letter-spacing: 0.5px;
-        }
-
-        td {
-            padding: 12px 14px;
-            border-bottom: 1px solid #e5e7eb;
-        }
-
-        .btn-refresh {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: transform 0.2s;
-        }
-
-        .btn-refresh:hover {
-            transform: scale(1.05);
-        }
-
-        .btn-refresh:active {
-            transform: scale(0.95);
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-top-color: white;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        .header-section {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            padding: 20px;
-            border-radius: 16px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .header-title {
-            color: white;
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin: 0;
-        }
-
-        .header-subtitle {
-            color: rgba(255, 255, 255, 0.8);
-            font-size: 1rem;
-            margin: 8px 0 0 0;
-        }
-
-        .week-badge {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-weight: 700;
-            font-size: 0.9rem;
-        }
-    </style>
+<style>
+body {
+    background: linear-gradient(135deg,#667eea,#764ba2);
+    padding:20px;
+}
+.glass {
+    background: rgba(255,255,255,.95);
+    border-radius:16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.15);
+}
+.badge-ok { background:#10b981; color:#fff; padding:4px 10px; border-radius:6px; font-size:12px; }
+.badge-pending { background:#ef4444; color:#fff; padding:4px 10px; border-radius:6px; font-size:12px; }
+</style>
 </head>
+
 <body>
 
-    <div class="max-w-7xl mx-auto">
-        <!-- Header -->
-        <div class="header-section flex justify-between items-start">
-            <div>
-                <h1 class="header-title">📋 Officer Task Dashboard</h1>
-                <p class="header-subtitle">Real-time task completion monitoring across all administrative divisions</p>
-            </div>
-            <div class="flex flex-col gap-3 items-end">
-                <div class="week-badge">
-                    <i class="fas fa-calendar-alt mr-2"></i><span id="weekDisplay">Loading...</span>
-                </div>
-                <button class="btn-refresh" onclick="refreshAllData()">
-                    <span id="refreshIcon"><i class="fas fa-sync-alt"></i></span>
-                    Refresh Data
-                </button>
-            </div>
-        </div>
+<div class="max-w-7xl mx-auto space-y-6">
 
-        <!-- KPI Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div class="kpi-card">
-                <div class="kpi-label">Total Officers</div>
-                <div class="kpi-value" id="totalOfficers">-</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">Total Pending Tasks</div>
-                <div class="kpi-value" id="totalPending">-</div>
-            </div>
-            <div class="kpi-card">
-                <div class="kpi-label">On Track</div>
-                <div class="kpi-value" id="onTrack">-</div>
-            </div>
-        </div>
+<h1 class="text-white text-3xl font-extrabold">📋 Ludhiana Administrative Task Tracker</h1>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Main Table (Left - 2/3) -->
-            <div class="lg:col-span-2">
-                <div class="glass-card overflow-hidden">
-                    <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                        <h2 class="text-xl font-800 text-gray-800">
-                            <i class="fas fa-tasks mr-2 text-purple-600"></i>Performance Tracking
-                        </h2>
-                        <span class="text-sm bg-gray-100 px-3 py-1 rounded-lg font-bold text-gray-600" id="officerCountBadge">0 Officers</span>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Officer Name</th>
-                                    <th class="text-center">Pending Tasks</th>
-                                    <th class="text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody id="mainTableBody">
-                                <tr>
-                                    <td colspan="3" class="text-center py-8 text-gray-400">
-                                        <i class="fas fa-spinner animate-spin mr-2"></i>Fetching data from Google Sheets...
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+<!-- KPI -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+<div class="glass p-4 text-center">
+<p class="text-gray-500 text-sm">Active Officers</p>
+<p id="totalOfficers" class="text-3xl font-extrabold">-</p>
+</div>
+<div class="glass p-4 text-center">
+<p class="text-gray-500 text-sm">Total Pending</p>
+<p id="totalPending" class="text-3xl font-extrabold">-</p>
+</div>
+<div class="glass p-4 text-center">
+<p class="text-gray-500 text-sm">Completed (7 Days)</p>
+<p id="totalCompletedWeek" class="text-3xl font-extrabold">-</p>
+</div>
+</div>
 
-                <!-- Chart -->
-                <div class="glass-card p-6 mt-6">
-                    <h3 class="text-lg font-800 text-gray-800 mb-4">
-                        <i class="fas fa-chart-bar mr-2 text-purple-600"></i>Task Distribution
-                    </h3>
-                    <div class="h-80">
-                        <canvas id="taskChart"></canvas>
-                    </div>
-                </div>
-            </div>
+<!-- Summary Table -->
+<div class="glass p-6">
+<h2 class="font-extrabold text-lg mb-4">Officer Summary (Spreadsheet 2)</h2>
+<table class="w-full border">
+<thead class="bg-indigo-600 text-white text-sm">
+<tr>
+<th class="p-2 text-left">Marked To</th>
+<th class="p-2 text-center">Completed (7d)</th>
+<th class="p-2 text-center">Pending</th>
+</tr>
+</thead>
+<tbody id="summaryBody"></tbody>
+</table>
+</div>
 
-            <!-- Star Performers (Right - 1/3) -->
-            <div class="glass-card overflow-hidden h-fit sticky top-20">
-                <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-amber-50 to-orange-50">
-                    <h3 class="text-lg font-800 text-gray-800 flex items-center gap-2">
-                        <i class="fas fa-star text-amber-500"></i>Star Performers
-                    </h3>
-                </div>
-                <div class="p-6 space-y-3" id="starPerformersContainer">
-                    <p class="text-center text-gray-400 text-sm py-4">
-                        <i class="fas fa-sync-alt animate-spin"></i>
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
+<!-- Main Table -->
+<div class="glass p-6">
+<h2 class="font-extrabold text-lg mb-4">Division Wise Status</h2>
+<table class="w-full border">
+<thead class="bg-indigo-600 text-white text-sm">
+<tr>
+<th class="p-2 text-left">Officer</th>
+<th class="p-2 text-center">Pending</th>
+<th class="p-2 text-center">Status</th>
+</tr>
+</thead>
+<tbody id="mainBody"></tbody>
+</table>
+</div>
 
-    <script>
-        // Sheet configuration
-        const SHEET_ID = '1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok';
+<canvas id="chart" height="120"></canvas>
 
-        const officersList = [
-            { name: "ADC G", gid: "174981592" },
-            { name: "ADC D", gid: "537074213" },
-            { name: "ADC UD", gid: "846764018" },
-            { name: "ADC K", gid: "1476602908" },
-            { name: "ADC J", gid: "18822170" },
-            { name: "ACG", gid: "1291568180" },
-            { name: "CMFO", gid: "1227420096" },
-            { name: "SDM East", gid: "33416154" },
-            { name: "SDM West", gid: "52989510" },
-            { name: "SDM Raikot", gid: "1833732603" },
-            { name: "SDM Samrala", gid: "190794459" },
-            { name: "SDM Khanna", gid: "2054147547" },
-            { name: "SDM Jargon", gid: "278920499" },
-            { name: "SDM Payal", gid: "778489712" },
-            { name: "DRO", gid: "501565659" },
-            { name: "RTA", gid: "1563439729" }
-        ];
+</div>
 
-        let chartInstance = null;
+<script>
+const MAIN_SHEET_ID = "1jspebqSTXgEtYyxYAE47_uRn6RQKFlHQhneuQoGiCok";
+const SUMMARY_SHEET_ID = "14-idXJHzHKCUQxxaqGZi-6S0G20gvPUhK4G16ci2FwI";
+const SUMMARY_GID = "213021534";
 
-        // Fetch and parse CSV
-        async function fetchSheetData(gid) {
-            try {
-                const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${gid}&t=${Date.now()}`;
-                const response = await fetch(url);
-                const csv = await response.text();
-                return parseCSV(csv);
-            } catch (error) {
-                console.error(`Error fetching sheet ${gid}:`, error);
-                return { rows: [], headerRow: [], weekLabel: 'Unknown' };
-            }
-        }
+const officers = [
+ {name:"ADC G",gid:"174981592"},
+ {name:"ADC D",gid:"537074213"},
+ {name:"ADC UD",gid:"846764018"},
+ {name:"ADC K",gid:"1476602908"},
+ {name:"ADC J",gid:"18822170"},
+ {name:"SDM East",gid:"33416154"},
+ {name:"SDM West",gid:"52989510"},
+ {name:"DRO",gid:"501565659"},
+ {name:"RTA",gid:"1563439729"}
+];
 
-        // Parse CSV data
-        function parseCSV(csv) {
-            const lines = csv.split('\n').map(line => line.trim()).filter(line => line);
-            if (lines.length < 2) return { rows: [], headerRow: [], weekLabel: 'Unknown' };
+async function fetchCSV(id,gid){
+ const r = await fetch(`https://docs.google.com/spreadsheets/d/${id}/export?format=csv&gid=${gid}&t=${Date.now()}`);
+ const t = await r.text();
+ return t.split("\n").map(r=>r.split(","));
+}
 
-            const headerRow = parseCSVLine(lines[0]);
-            const rows = lines.slice(1).map(line => parseCSVLine(line));
+async function processSummary(){
+ const data = await fetchCSV(SUMMARY_SHEET_ID,SUMMARY_GID);
+ const header = data[0].map(h=>h.toLowerCase());
+ const rows = data.slice(1);
 
-            // Get week label from first or second row (usually merged cells show in row 0)
-            let weekLabel = 'Current Week';
-            if (headerRow.length > 0 && headerRow[0]) {
-                weekLabel = headerRow[0];
-            }
+ const offIdx = header.findIndex(h=>h.includes("officer")||h.includes("marked"));
+ const statIdx = header.findIndex(h=>h.includes("status"));
+ const dateIdx = header.findIndex(h=>h.includes("date"));
 
-            return { rows, headerRow, weekLabel };
-        }
+ const sevenDaysAgo = new Date();
+ sevenDaysAgo.setDate(sevenDaysAgo.getDate()-7);
 
-        // Parse individual CSV line
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let insideQuotes = false;
+ const map = {};
 
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
+ rows.forEach(r=>{
+   const name = (r[offIdx]||"").trim();
+   if(!name) return;
 
-                if (char === '"') {
-                    insideQuotes = !insideQuotes;
-                } else if (char === ',' && !insideQuotes) {
-                    result.push(current.trim());
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            result.push(current.trim());
-            return result;
-        }
+   const status = (r[statIdx]||"").toLowerCase().trim();
+   const date = dateIdx>-1 ? new Date(r[dateIdx]) : null;
 
-        // Analyze sheet to count pending tasks
-        function analyzeSheet(data) {
-            const { rows, headerRow, weekLabel } = data;
+   if(!map[name]) map[name]={completed:0,pending:0};
 
-            if (rows.length === 0) {
-                return { pendingCount: 0, status: 'Empty', week: 'Unknown' };
-            }
+   // ✅ STRICT STATUS LOGIC
+   if(["completed","done","yes"].includes(status)){
+       if(!date || isNaN(date) || date>=sevenDaysAgo){
+           map[name].completed++;
+       }
+   }
+   else if(["pending","in progress","in-progress","ongoing"].includes(status)){
+       map[name].pending++;
+   }
+   // everything else ignored
+ });
 
-            // Find the Status column - scan from right to left
-            let statusColumnIndex = -1;
+ return Object.entries(map).map(([name,v])=>({name,...v}));
+}
 
-            // Look through header for "Status" or check rightmost columns
-            for (let i = headerRow.length - 1; i >= 0; i--) {
-                const header = headerRow[i].toLowerCase();
-                if (header.includes('status')) {
-                    statusColumnIndex = i;
-                    break;
-                }
-            }
+async function processOfficer(gid){
+ const data = await fetchCSV(MAIN_SHEET_ID,gid);
+ const header = data[0].map(h=>h.toLowerCase());
+ const rows = data.slice(1);
+ const sIdx = header.findIndex(h=>h.includes("status"));
+ let p=0;
+ rows.forEach(r=>{
+   const s=(r[sIdx]||"").toLowerCase().trim();
+   if(["pending","in progress","in-progress","ongoing"].includes(s)) p++;
+ });
+ return p;
+}
 
-            // If not found by header, search for column with most "Completed"/"Pending" keywords
-            if (statusColumnIndex === -1) {
-                let maxKeywordCount = 0;
-                for (let col = headerRow.length - 1; col >= 0; col--) {
-                    let keywordCount = 0;
-                    for (let row of rows) {
-                        const cellValue = (row[col] || '').toLowerCase();
-                        if (cellValue.includes('completed') || cellValue.includes('pending')) {
-                            keywordCount++;
-                        }
-                    }
-                    if (keywordCount > 0) {
-                        statusColumnIndex = col;
-                        break;
-                    }
-                }
-            }
+async function load(){
+ const summary = await processSummary();
+ const main = [];
 
-            // Count pending tasks
-            let pendingCount = 0;
-            if (statusColumnIndex >= 0) {
-                for (let row of rows) {
-                    const statusValue = (row[statusColumnIndex] || '').toLowerCase().trim();
-                    if (statusValue === 'pending') {
-                        pendingCount++;
-                    }
-                }
-            }
+ for(const o of officers){
+   const p = await processOfficer(o.gid);
+   main.push({name:o.name,pending:p});
+ }
 
-            return {
-                pendingCount,
-                status: pendingCount === 0 ? 'Complete' : 'Incomplete',
-                week: weekLabel
-            };
-        }
+ document.getElementById("totalOfficers").innerText = main.length;
+ document.getElementById("totalPending").innerText = main.reduce((a,b)=>a+b.pending,0);
+ document.getElementById("totalCompletedWeek").innerText = summary.reduce((a,b)=>a+b.completed,0);
 
-        // Refresh all data
-        async function refreshAllData() {
-            const refreshIcon = document.getElementById('refreshIcon');
-            refreshIcon.innerHTML = '<i class="fas fa-spinner animate-spin"></i>';
+ document.getElementById("summaryBody").innerHTML = summary.map(s=>`
+ <tr>
+ <td class="p-2 font-bold">${s.name}</td>
+ <td class="p-2 text-center">${s.completed}</td>
+ <td class="p-2 text-center">${s.pending}</td>
+ </tr>`).join("");
 
-            const results = [];
-            let weekLabel = 'Current Week';
+ document.getElementById("mainBody").innerHTML = main.map(m=>`
+ <tr>
+ <td class="p-2 font-bold">${m.name}</td>
+ <td class="p-2 text-center">${m.pending}</td>
+ <td class="p-2 text-center">
+   ${m.pending>0 ? '<span class="badge-pending">Action</span>' : '<span class="badge-ok">Clear</span>'}
+ </td>
+ </tr>`).join("");
 
-            for (const officer of officersList) {
-                const sheetData = await fetchSheetData(officer.gid);
-                const analysis = analyzeSheet(sheetData);
-                results.push({
-                    name: officer.name,
-                    ...analysis
-                });
+ new Chart(document.getElementById("chart"),{
+   type:"bar",
+   data:{labels:main.map(m=>m.name),
+   datasets:[{data:main.map(m=>m.pending)}]},
+   options:{plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}
+ });
+}
 
-                // Capture week label from first successful fetch
-                if (weekLabel === 'Current Week' && analysis.week !== 'Unknown') {
-                    weekLabel = analysis.week;
-                }
-            }
-
-            updateUI(results, weekLabel);
-            refreshIcon.innerHTML = '<i class="fas fa-sync-alt"></i>';
-        }
-
-        // Update UI
-        function updateUI(data, weekLabel) {
-            updateTable(data);
-            updateKPIs(data);
-            updateStarPerformers(data);
-            updateChart(data);
-            updateWeekDisplay(weekLabel);
-        }
-
-        // Update main table
-        function updateTable(data) {
-            const tbody = document.getElementById('mainTableBody');
-            tbody.innerHTML = '';
-
-            data.forEach(officer => {
-                const row = document.createElement('tr');
-                const hasIncomplete = officer.pendingCount > 0;
-                row.className = hasIncomplete ? 'table-row-pending' : 'table-row-completed';
-
-                row.innerHTML = `
-                    <td class="font-semibold text-gray-800">${officer.name}</td>
-                    <td class="text-center">
-                        <span class="text-2xl font-800 ${hasIncomplete ? 'text-red-600' : 'text-green-600'}">
-                            ${officer.pendingCount}
-                        </span>
-                    </td>
-                    <td class="text-center">
-                        <span class="${hasIncomplete ? 'status-badge-pending' : 'status-badge-completed'}">
-                            ${hasIncomplete ? 'Pending' : 'Completed'}
-                        </span>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-
-            document.getElementById('officerCountBadge').textContent = `${data.length} Officers`;
-        }
-
-        // Update KPI cards
-        function updateKPIs(data) {
-            document.getElementById('totalOfficers').textContent = data.length;
-
-            const totalPending = data.reduce((sum, d) => sum + d.pendingCount, 0);
-            document.getElementById('totalPending').textContent = totalPending;
-
-            const onTrack = data.filter(d => d.pendingCount === 0).length;
-            document.getElementById('onTrack').textContent = onTrack;
-        }
-
-        // Update star performers
-        function updateStarPerformers(data) {
-            const container = document.getElementById('starPerformersContainer');
-            const stars = data.filter(d => d.pendingCount === 0);
-
-            if (stars.length === 0) {
-                container.innerHTML = '<p class="text-center text-gray-400 text-sm py-4">No star performers yet. Keep working!</p>';
-                return;
-            }
-
-            container.innerHTML = stars.map(officer => `
-                <div class="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-lg border-l-4 border-amber-500 flex justify-between items-center">
-                    <span class="font-bold text-gray-800">${officer.name}</span>
-                    <span class="star-badge">
-                        <i class="fas fa-medal"></i> 0 Pending
-                    </span>
-                </div>
-            `).join('');
-        }
-
-        // Update chart
-        function updateChart(data) {
-            const ctx = document.getElementById('taskChart').getContext('2d');
-
-            if (chartInstance) {
-                chartInstance.destroy();
-            }
-
-            chartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: data.map(d => d.name),
-                    datasets: [{
-                        label: 'Pending Tasks',
-                        data: data.map(d => d.pendingCount),
-                        backgroundColor: data.map(d => 
-                            d.pendingCount > 0 
-                                ? 'rgba(239, 68, 68, 0.8)' 
-                                : 'rgba(16, 185, 129, 0.8)'
-                        ),
-                        borderColor: data.map(d => 
-                            d.pendingCount > 0 
-                                ? 'rgba(239, 68, 68, 1)' 
-                                : 'rgba(16, 185, 129, 1)'
-                        ),
-                        borderWidth: 2,
-                        borderRadius: 8,
-                        hoverBackgroundColor: data.map(d => 
-                            d.pendingCount > 0 
-                                ? 'rgba(239, 68, 68, 1)' 
-                                : 'rgba(16, 185, 129, 1)'
-                        )
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                            ticks: { stepSize: 1 }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: {
-                                font: { size: 11, weight: '700' }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Update week display
-        function updateWeekDisplay(weekLabel) {
-            document.getElementById('weekDisplay').textContent = weekLabel || 'Current Week';
-        }
-
-        // Auto-refresh every 5 minutes
-        window.addEventListener('load', () => {
-            refreshAllData();
-            setInterval(refreshAllData, 5 * 60 * 1000);
-        });
-    </script>
+load();
+</script>
 
 </body>
 </html>
